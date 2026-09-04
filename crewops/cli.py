@@ -325,6 +325,13 @@ def cmd_brief(args: argparse.Namespace) -> int:
 
 def cmd_eval(args: argparse.Namespace) -> int:
     from . import evaluate
+    if args.e2e:
+        # The kernel score measures exact arithmetic. This measures whether a
+        # typed question reaches it. Different claims; we publish both.
+        r = evaluate.run_e2e(data_dir=args.data,
+                             use_model=None if args.model else False)
+        print(evaluate.render_e2e(r))
+        return 0
     rep = evaluate.run(data_dir=args.data)
     if args.json:
         with open(args.json, "w", encoding="utf-8") as fh:
@@ -394,6 +401,10 @@ def main(argv: list[str] | None = None) -> int:
     e = sub.add_parser("eval", help="run the answer-key regression")
     e.add_argument("--json", help="write a JSON summary here")
     e.add_argument("--verbose", action="store_true")
+    e.add_argument("--e2e", action="store_true",
+                   help="route the shipped prompts through the language layer")
+    e.add_argument("--model", action="store_true",
+                   help="with --e2e, allow the model planner (slower, better)")
     e.set_defaults(fn=cmd_eval)
 
     s = sub.add_parser("status", help="dataset and engine health")

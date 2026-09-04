@@ -120,9 +120,11 @@ def find_flights(snap: Snapshot, **kw: Any) -> Result:
 
 @tool("find_crew",
       {"crew_id": "e.g. C-1042", "rank": "Captain | First Officer | "
-       "Senior Cabin Crew | Cabin Crew", "base": "3-letter code",
-       "rating": "A320 | ATR72", "status": "active | leave | training",
-       "name": "partial name match"},
+       "Senior Cabin Crew | Cabin Crew",
+       "ranks": "list, for a class such as pilots = Captain + First Officer",
+       "base": "3-letter code", "rating": "A320 | ATR72",
+       "status": "active | leave | training", "name": "partial name match",
+       "limit": "return at most N"},
       (), "retrieval", "Crew records by any combination of attributes.")
 def find_crew(snap: Snapshot, **kw: Any) -> Result:
     led = Ledger()
@@ -132,16 +134,24 @@ def find_crew(snap: Snapshot, **kw: Any) -> Result:
     for key, attr in (("rank", "rank"), ("base", "base"), ("status", "status")):
         if kw.get(key):
             rows = [c for c in rows if getattr(c, attr) == kw[key]]
+    if kw.get("ranks"):
+        wanted = set(kw["ranks"])
+        rows = [c for c in rows if c.rank in wanted]
     if kw.get("rating"):
         rows = [c for c in rows if kw["rating"] in c.ratings]
     if kw.get("name"):
         needle = kw["name"].lower()
         rows = [c for c in rows if needle in c.name.lower()]
     rows.sort(key=lambda c: c.crew_id)
-    led.add("matching_crew", len(rows), source="crew.json")
+    total = len(rows)
+    if kw.get("limit"):
+        rows = rows[: int(kw["limit"])]
+    led.add("matching_crew", total, source="crew.json")
+    if kw.get("limit"):
+        led.add("returned", len(rows), derivation=f"limited to {kw['limit']} of {total}")
     return {
         "crew_ids": [c.crew_id for c in rows],
-        "count": len(rows),
+        "count": len(rows), "total_matching": total,
         "rows": [{"crew_id": c.crew_id, "name": c.name, "rank": c.rank,
                   "base": c.base, "ratings": list(c.ratings),
                   "seniority": c.seniority, "status": c.status,
@@ -189,6 +199,7 @@ def get_roster(snap: Snapshot, **kw: Any) -> Result:
 @tool("get_reserves",
       {"date": "YYYY-MM-DD", "crew_id": "e.g. C-3310",
        "base": "3-letter code", "rank": "Captain | ...",
+       "ranks": "list, for a class such as pilots",
        "rating": "A320 | ATR72", "covers_utc": "full ISO timestamp"},
       ("date",), "retrieval",
       "Standby crew on call for a date, optionally filtered to those whose "
@@ -206,6 +217,8 @@ def get_reserves(snap: Snapshot, **kw: Any) -> Result:
         if kw.get("base") and r.base != kw["base"]:
             continue
         if kw.get("rank") and c.rank != kw["rank"]:
+            continue
+        if kw.get("ranks") and c.rank not in set(kw["ranks"]):
             continue
         if kw.get("rating") and kw["rating"] not in c.ratings:
             continue
