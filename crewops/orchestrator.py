@@ -97,12 +97,39 @@ PAT = {
     "time": re.compile(r"\b(\d{1,2}):(\d{2})\s*Z?\b"),
     "duration": re.compile(r"(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?)\b",
                            re.I),
-    "rank": re.compile(r"\b(senior cabin crew|first officer|captain|cabin crew)\b",
-                       re.I),
+    # Ranks: plurals, abbreviations and CLASS words. A controller says
+    # "captains", "FOs", "pilots" -- never "Senior Cabin Crew" in full. The
+    # earlier singular-only pattern silently bound no rank at all, so "give me
+    # 5 captains" returned all 150 crew, cabin crew included, presented as
+    # captains. Longest alternatives first so "senior cabin crew" wins over
+    # "cabin crew".
+    "rank": re.compile(
+        r"\b(senior cabin crew|scc|first officers?|f/?os?\b|cabin crew|"
+        r"captains?|skippers?|pilots?|flight ?deck|crew members?)\b", re.I),
+    "rating": re.compile(r"\b(a-?320|atr-? ?72|atr)\b", re.I),
+    # "5 pilots", "top 3", "first 10"
+    "count": re.compile(r"\b(?:top|first|any|need|give me|show me|list)?\s*"
+                        r"(\d{1,3})\s+(?=[a-z])", re.I),
 }
 
-RANKS = {"captain": "Captain", "first officer": "First Officer",
-         "senior cabin crew": "Senior Cabin Crew", "cabin crew": "Cabin Crew"}
+# A rank word can name a CLASS, not one rank. "pilots" is two ranks; asking for
+# pilots and getting only First Officers is the kind of quietly wrong answer
+# this system exists to avoid.
+RANKS: dict[str, list[str]] = {
+    "captain": ["Captain"], "captains": ["Captain"],
+    "skipper": ["Captain"], "skippers": ["Captain"],
+    "first officer": ["First Officer"], "first officers": ["First Officer"],
+    "fo": ["First Officer"], "fos": ["First Officer"],
+    "f/o": ["First Officer"], "f/os": ["First Officer"],
+    "senior cabin crew": ["Senior Cabin Crew"], "scc": ["Senior Cabin Crew"],
+    "cabin crew": ["Cabin Crew"],
+    "pilot": ["Captain", "First Officer"], "pilots": ["Captain", "First Officer"],
+    "flight deck": ["Captain", "First Officer"],
+    "crew member": [], "crew members": [],      # no filter, but not "unknown"
+}
+
+RATINGS = {"a320": "A320", "a-320": "A320",
+           "atr72": "ATR72", "atr 72": "ATR72", "atr-72": "ATR72", "atr": "ATR72"}
 
 
 @dataclass
@@ -115,7 +142,14 @@ class Entities:
     dates: list[str] = field(default_factory=list)
     times: list[str] = field(default_factory=list)
     hours: float | None = None
-    rank: str | None = None
+    ranks: list[str] = field(default_factory=list)   # a class may be 2 ranks
+    rating: str | None = None
+    limit: int | None = None
+
+    @property
+    def rank(self) -> str | None:
+        """The single rank, when the phrase named exactly one."""
+        return self.ranks[0] if len(self.ranks) == 1 else None
 
     def as_dict(self) -> dict[str, Any]:
         return {k: v for k, v in self.__dict__.items() if v}
@@ -137,7 +171,41 @@ def extract(question: str, snap: Snapshot) -> Entities:
         e.hours = round(v / 60.0, 2) if m.group(2).lower().startswith("min") else v
     r = PAT["rank"].search(question)
     if r:
-        e.rank = RANKS[r.group(1).lower()]
+        e.ranks = RANKS.get(r.group(1).lower().replace("/", "").replace("  ", " "), [])
+    g = PAT["rating"].search(question)
+    if g:
+        e.rating = RATINGS.get(g.group(1).lower().replace(" ", "").replace("-", ""),
+                               RATINGS.get(g.group(1).lower()))
+    c = PAT["count"].search(question)
+    if c:
+        n = int(c.group(1))
+        if 1 <= n <= 200:
+            e.limit = n
+
+    # Relative dates are resolved HERE, not in the caller. They used to be
+    # computed for the assumption note and then thrown away, so "tomorrow"
+    # never reached the tools -- and get_reserves' own default quietly filled
+    # the hole, meaning the system stated one date and queried another.
+    if not e.dates:
+        today = snap.snapshot_utc.date()
+        low = question.lower()
+        if "tomorrow" in low:
+            e.dates = [(today + timedelta(days=1)).isoformat()]
+        elif "today" in low or "tonight" in low:
+            e.dates = [today.isoformat()]
+        elif "yesterday" in low:
+            e.dates = [(today - timedelta(days=1)).isoformat()]
+        else:
+            m2 = re.search(r"(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|"
+                           r"sep|oct|nov|dec)", question, re.I)
+            if m2:
+                mo = ["jan","feb","mar","apr","may","jun",
+                      "jul","aug","sep","oct","nov","dec"].index(
+                          m2.group(2)[:3].lower()) + 1
+                try:
+                    e.dates = [_date(today.year, mo, int(m2.group(1))).isoformat()]
+                except ValueError:
+                    pass
 
     # names, only when no id was given -- they are not unique in this dataset
     if not e.crew:
@@ -254,7 +322,7 @@ INTENTS: list[Intent] = [
     ]),
 
     Intent("find_flights", [
-        "which flights", "flights departing", "flights arriving", "schedule",
+        "which flights depart", "which flights operate", "flights departing", "flights arriving", "schedule",
         "how many flights", "longest block time", "which destinations",
         "what legs are there", "how many seats",
     ]),
@@ -270,15 +338,35 @@ INTENTS: list[Intent] = [
     ]),
 
     Intent("compute_duty_period", [
-        "earliest next report", "minimum rest", "when can they report next",
-        "how long is the duty",
+        "earliest next report", "when can they report next",
+        "minimum rest before they report", "how much rest do they need",
     ]),
 
     Intent("get_rulebook", [
         "what does the rule say", "what is the limit", "show me the rules",
         "what are the callout rates", "how much does a callout cost",
+        "what is the rulebook", "show the rule text", "what is the limit for",
     ]),
 ]
+
+# Which tool parameters consume which extracted entity. Adding a tool means
+# adding a row, never editing the scorer.
+ENTITY_AFFINITY = {
+    "crew":     ("crew_id",),
+    "pairing":  ("pairing_id", "exclude_pairing"),
+    "flight":   ("flight_no", "flight_id"),
+    "aircraft": ("aircraft",),
+    "station":  ("station", "base", "dep_station", "arr_station"),
+    "date":     ("date", "end_date", "valid_on", "start_utc"),
+    "duration": ("delay_hours",),
+    "rank":     ("rank", "role"),
+    "rating":   ("rating", "aircraft_type"),
+}
+AFFINITY_WEIGHT = {
+    "pairing": 0.30, "crew": 0.22, "duration": 0.30, "flight": 0.18,
+    "aircraft": 0.16, "rank": 0.20, "rating": 0.14, "station": 0.12,
+    "date": 0.06,
+}
 
 _STOP = {"the", "a", "an", "of", "and", "or", "to", "for", "in", "on", "at",
          "is", "are", "was", "be", "with", "from", "it", "my", "me", "we",
@@ -328,6 +416,13 @@ _INDEX = [(i, [_tokens(x) for x in i.examples]) for i in INTENTS]
 def score_intents(question: str, ents: Entities) -> list[tuple[float, Intent]]:
     """Score every capability against the question. Transparent and orderable."""
     q = _tokens(question)
+    present = {
+        "crew": bool(ents.crew), "pairing": bool(ents.pairings),
+        "flight": bool(ents.flights), "aircraft": bool(ents.aircraft),
+        "station": bool(ents.stations), "date": bool(ents.dates),
+        "time": bool(ents.times), "duration": ents.hours is not None,
+        "rank": bool(ents.ranks), "rating": bool(ents.rating),
+    }
     have = {
         "crew": bool(ents.crew), "pairing": bool(ents.pairings),
         "station": bool(ents.stations), "duration": ents.hours is not None,
@@ -344,14 +439,17 @@ def score_intents(question: str, ents: Entities) -> list[tuple[float, Intent]]:
         if not best:
             continue
         s = best * intent.boost
-        # Parameter affinity: if the question named something this tool
-        # can actually accept, prefer it. "list the captains at DEL" ties
-        # on words alone, and only find_crew takes a rank.
+        # Parameter affinity, generalised. Word overlap alone produces ties
+        # that were being broken by position in this list -- so "who is on
+        # P-2291" went to get_reserves purely because it is declared earlier.
+        # Preferring the tool that can actually CONSUME what the question named
+        # is a real signal, and it is declarative rather than another branch.
         params = REGISTRY[intent.tool].params
-        if ents.rank and "rank" in params:
-            s += 0.20
-        if ents.stations and ("base" in params or "station" in params):
-            s += 0.05
+        for kind, param_names in ENTITY_AFFINITY.items():
+            if not present.get(kind):
+                continue
+            if any(pn in params for pn in param_names):
+                s += AFFINITY_WEIGHT.get(kind, 0.10)
         if intent.needs and not all(have.get(n, False) for n in intent.needs):
             s *= 0.25          # plausible, but we lack what it needs
         scored.append((s, intent))
@@ -403,9 +501,15 @@ def bind_args(tool: str, ents: Entities, snap: Snapshot,
     put("pairing_id", pairing)
     put("aircraft", ents.aircraft[0] if ents.aircraft else None)
     put("flight_no", ents.flights[0] if ents.flights else None)
-    put("rank", ents.rank)
+    put("rank", ents.rank)          # only when the phrase named exactly one
     put("role", ents.rank)
+    if len(ents.ranks) > 1:
+        put("ranks", list(ents.ranks))   # a class: "pilots" is two ranks
+    put("rating", ents.rating)
     put("delay_hours", ents.hours)
+    if ents.limit is not None:
+        put("top_n", ents.limit)
+        put("limit", ents.limit)
 
     if ents.dates:
         put("date", ents.dates[0])
@@ -413,7 +517,10 @@ def bind_args(tool: str, ents: Entities, snap: Snapshot,
     if "end_date" in params and "end_date" not in a:
         a["end_date"] = snap.snapshot_utc.date().isoformat()
     if tool == "get_reserves" and "date" not in a:
-        a["date"] = (snap.snapshot_utc.date() + timedelta(days=1)).isoformat()
+        # No silent default. Saying "on call" without a date is genuinely
+        # ambiguous; the validator turns the missing required arg into a
+        # clarifying question instead of quietly answering about tomorrow.
+        pass
 
     if ents.stations:
         if tool == "simulate_station_closure":
@@ -454,10 +561,20 @@ def bind_args(tool: str, ents: Entities, snap: Snapshot,
 # ==========================================================================
 
 
-def plan_from_index(question: str, ents: Entities, snap: Snapshot) -> Plan | None:
+# Above CONFIDENT the index is trusted outright: it is instant and
+# reproducible, which matters on stage. Between FLOOR and CONFIDENT it is only
+# a fallback for when no model is configured. Below FLOOR there is no answer --
+# we refuse rather than serve the nearest plausible tool, which is exactly how
+# "I need 5 pilots" used to come back as somebody else's question.
+CONFIDENT = 0.75
+FLOOR = 0.40
+
+
+def plan_from_index(question: str, ents: Entities, snap: Snapshot,
+                    min_score: float = FLOOR) -> Plan | None:
     """Deterministic single-step plan. Fast, reproducible, no network."""
     for s, intent in score_intents(question, ents)[:4]:
-        if s < 0.34:
+        if s < min_score:
             break
         args = bind_args(intent.tool, ents, snap, question)
         if [r for r in REGISTRY[intent.tool].required if r not in args]:
@@ -504,6 +621,14 @@ def plan_from_model(question: str, ents: Entities, client: Any) -> Plan | None:
         return None
     steps = [Step(s.get("tool", ""), s.get("args") or {}, s.get("why", ""))
              for s in (obj.get("steps") or []) if s.get("tool")]
+    # Models sometimes emit the same call twice ("find_crew -> find_crew").
+    # A duplicate step costs time and tells the controller nothing.
+    dedup: list[Step] = []
+    for st in steps:
+        if dedup and dedup[-1].tool == st.tool and dedup[-1].args == st.args:
+            continue
+        dedup.append(st)
+    steps = dedup
     if not steps:
         return None
     return Plan(steps, f"model:{client.provider}", obj.get("why", ""))

@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="en" data-theme="dark"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crew Ops Advisor · dCortex Air</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* EFIS instrument palette: cyan = reference value, amber = caution,
+   red = warning, green = normal. The operator's own colour language. */
+:root{
+  --bg:#070b10; --panel:#0f151d; --panel2:#151d27; --panel3:#1c2631;
+  --ink:#e8eef4; --ink2:#93a3b3; --ink3:#61717f;
+  --line:#1f2a36; --line2:#2b3947;
+  --cyan:#4fc3e8; --cyan-dim:#123243;
+  --amber:#e8a33d; --amber-dim:#33260f;
+  --red:#f0705f; --red-dim:#361713;
+  --green:#5fc98c; --green-dim:#0f2b1d;
+  --magenta:#cf8fc4; --magenta-dim:#2a1a28;
+  --d:'Archivo',system-ui,-apple-system,sans-serif;
+  --b:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --m:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Consolas,monospace;
+  --ez:cubic-bezier(.4,0,.2,1);
+}
+:root[data-theme="light"]{
+  --bg:#eef1f5; --panel:#fff; --panel2:#e8edf2; --panel3:#dde4ec;
+  --ink:#0e151d; --ink2:#4b5a68; --ink3:#78879a;
+  --line:#d5dde5; --line2:#c0cbd6;
+  --cyan:#0b6280; --cyan-dim:#dcedf4; --amber:#8a5a08; --amber-dim:#f8eeda;
+  --red:#a02a1d; --red-dim:#fae4e1; --green:#256b45; --green-dim:#e0f0e7;
+  --magenta:#87397d; --magenta-dim:#f3e5f1;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--b);font-size:14.5px;
+  line-height:1.55;-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+::selection{background:var(--cyan);color:var(--bg)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+#app{display:grid;grid-template-rows:auto 1fr;height:100%}
+#bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:0 16px;
+  min-height:44px;background:var(--panel);border-bottom:1px solid var(--line);
+  font-family:var(--m);font-size:10.5px;letter-spacing:.07em;color:var(--ink2);
+  text-transform:uppercase}
+#bar b{color:var(--ink);font-weight:600}
+.sep{width:1px;height:15px;background:var(--line2)}
+.led{width:6px;height:6px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 7px var(--green);display:inline-block;margin-right:6px}
+.led.off{background:var(--ink3);box-shadow:none}
+#mode{font-weight:600;padding:3px 9px;border-radius:3px;letter-spacing:.1em;
+  color:var(--green);background:var(--green-dim);border:1px solid currentColor;
+  transition:color .35s var(--ez),background .35s var(--ez)}
+#mode.whatif{color:var(--amber);background:var(--amber-dim)}
+#score{margin-left:auto;display:flex;gap:12px;align-items:center}
+.wrong0{color:var(--green)}
+
+#cols{display:grid;grid-template-columns:274px minmax(0,1fr) 0;height:100%;
+  overflow:hidden;transition:grid-template-columns .3s var(--ez)}
+#cols.ev{grid-template-columns:274px minmax(0,1fr) 380px}
+@media(max-width:1100px){#cols,#cols.ev{grid-template-columns:1fr}
+  #board,#evi{display:none}}
+
+#board{background:var(--panel);border-right:1px solid var(--line);
+  overflow-y:auto;padding:14px 0 40px}
+.grp{padding:0 14px;margin-bottom:22px}
+.grp h2{font-family:var(--m);font-size:9.5px;letter-spacing:.14em;color:var(--ink3);
+  text-transform:uppercase;margin-bottom:9px;display:flex;gap:7px;align-items:center}
+.grp h2::after{content:'';flex:1;height:1px;background:var(--line)}
+
+.alert{border-left:2px solid var(--red);background:var(--red-dim);padding:9px 11px;
+  border-radius:0 3px 3px 0;margin-bottom:7px}
+.alert .t{font-family:var(--m);font-size:9px;letter-spacing:.11em;color:var(--red);
+  font-weight:600;margin-bottom:3px}
+.alert .b{font-size:12.5px;line-height:1.4}
+.alert .s{font-size:11.5px;color:var(--ink2);margin-top:2px}
+
+.frag{display:flex;align-items:center;gap:9px;padding:6px 0;width:100%;
+  border-bottom:1px solid var(--line);font-size:12px;text-align:left;
+  transition:color .15s}
+.frag:last-child{border-bottom:0}
+.frag:hover{color:var(--cyan)}
+.frag .n{font-family:var(--m);font-weight:600;width:20px;text-align:center;
+  padding:1px 0;border-radius:2px;font-size:11px}
+.frag .n.crit{color:var(--red);background:var(--red-dim)}
+.frag .n.warn{color:var(--amber);background:var(--amber-dim)}
+.frag .n.ok{color:var(--ink3)}
+.frag .id{font-family:var(--m)}
+.frag .r{color:var(--ink3);font-size:11px;margin-left:auto}
+
+.gapbar{display:flex;gap:1px;margin:5px 0 3px}
+.gapbar i{flex:1;height:15px;border-radius:1px;background:var(--green-dim)}
+.gapbar i.x{background:var(--red);opacity:.75}
+.gaplbl{font-family:var(--m);font-size:9px;color:var(--ink3);
+  display:flex;justify-content:space-between}
+
+.ex{display:block;width:100%;text-align:left;padding:6px 8px;border-radius:3px;
+  font-size:12.5px;color:var(--ink2);line-height:1.35;
+  transition:background .16s,color .16s,transform .16s var(--ez)}
+.ex:hover{background:var(--panel2);color:var(--ink);transform:translateX(2px)}
+.tg{font-family:var(--m);font-size:8.5px;letter-spacing:.1em;padding:1px 4px;
+  border-radius:2px;margin-right:6px}
+.tg.t1{color:var(--cyan);background:var(--cyan-dim)}
+.tg.t2{color:var(--magenta);background:var(--magenta-dim)}
+.tg.t3{color:var(--green);background:var(--green-dim)}
+.tg.t4{color:var(--amber);background:var(--amber-dim)}
+
+#desk{display:grid;grid-template-rows:1fr auto;overflow:hidden;min-width:0}
+#feed{overflow-y:auto;padding:22px 26px 8px;scroll-behavior:smooth}
+#feedInner{max-width:840px;margin:0 auto}
+#hero{padding:34px 0 24px;border-bottom:1px solid var(--line);margin-bottom:22px}
+#hero h1{font-family:var(--d);font-weight:800;font-size:clamp(26px,3.4vw,34px);
+  letter-spacing:-.025em;line-height:1.05;margin-bottom:9px}
+#hero p{color:var(--ink2);font-size:15px;max-width:56ch}
+#hero .k{color:var(--ink);font-weight:600}
+
+.turn{margin-bottom:26px}
+.you{font-family:var(--d);font-size:15px;font-weight:600;color:var(--ink2);
+  display:flex;gap:9px;align-items:baseline;margin-bottom:11px}
+.you::before{content:'\25B8';color:var(--cyan);font-size:12px}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:5px;
+  overflow:hidden;position:relative}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--cyan)}
+.card.no::before{background:var(--red)}
+.card.yes::before{background:var(--green)}
+.card.refuse::before{background:var(--amber)}
+.card.drafted::before{background:repeating-linear-gradient(180deg,
+  var(--amber) 0 4px,transparent 4px 8px)}
+.card > .body{padding:17px 20px}
+
+.lede{font-family:var(--d);font-size:16.5px;font-weight:600;line-height:1.42;
+  letter-spacing:-.008em;margin-bottom:10px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;font-family:var(--m);font-size:9.5px;
+  letter-spacing:.08em;color:var(--ink3);text-transform:uppercase;
+  align-items:center;margin-top:2px}
+.tag{padding:2px 6px;border-radius:2px;border:1px solid var(--line2)}
+.tag.hi{color:var(--cyan);border-color:currentColor}
+.tag.md{color:var(--amber);border-color:currentColor}
+.tag.pv{color:var(--magenta);border-color:currentColor}
+.assume{font-family:var(--m);font-size:10.5px;color:var(--amber);margin-top:6px}
+
+.verdict{font-family:var(--d);font-weight:800;font-size:27px;letter-spacing:-.02em;
+  line-height:1;margin:15px 0 11px;display:flex;align-items:center;gap:11px}
+.verdict .gl{font-size:15px}
+.verdict.no{color:var(--red)} .verdict.yes{color:var(--green)}
+
+.bind{font-family:var(--m);font-size:12px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:3px;padding:10px 13px;
+  display:flex;flex-wrap:wrap;gap:5px 20px;margin-bottom:12px;
+  font-variant-numeric:tabular-nums}
+.bind span{white-space:nowrap}
+.bind .l{color:var(--ink3);margin-right:5px}
+.bind .v{font-weight:500}
+.bind .v.bad{color:var(--red)}
+
+.gauge{height:9px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:2px;position:relative;overflow:hidden;margin-bottom:14px}
+.gauge i{position:absolute;top:0;bottom:0;display:block}
+.gauge .fill{left:0;width:0;background:var(--cyan);opacity:.55}
+.gauge .over{width:0;background:var(--red);opacity:.8}
+.gauge .tick{top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.9}
+
+.issue{background:var(--red-dim);border-left:2px solid var(--red);padding:7px 11px;
+  margin-bottom:6px;border-radius:0 3px 3px 0;font-family:var(--m);font-size:12px;
+  line-height:1.5}
+.sect{font-family:var(--m);font-size:9.5px;letter-spacing:.13em;color:var(--ink3);
+  text-transform:uppercase;margin:17px 0 8px;display:flex;gap:8px;align-items:center}
+.sect::after{content:'';flex:1;height:1px;background:var(--line)}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-family:var(--m);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink3);padding:6px 9px;
+  border-bottom:1px solid var(--line2);white-space:nowrap}
+td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td.m{font-family:var(--m);white-space:nowrap}
+td.n{font-family:var(--m);text-align:right;font-variant-numeric:tabular-nums;
+  white-space:nowrap}
+tr.win td{background:var(--green-dim)}
+tr.win td:first-child{box-shadow:inset 2px 0 0 var(--green)}
+tr.bad td{background:var(--red-dim)}
+.tie{display:inline-block;min-width:15px;text-align:center;font-family:var(--m);
+  font-size:9.5px;color:var(--ink3);border:1px solid var(--line2);border-radius:2px}
+.wbtn{font-family:var(--m);font-size:9.5px;letter-spacing:.06em;color:var(--ink3);
+  border:1px solid var(--line2);border-radius:2px;padding:1px 5px;
+  transition:color .15s,border-color .15s}
+.wbtn:hover{color:var(--amber);border-color:var(--amber)}
+.scrollx{overflow-x:auto;margin:0 -20px;padding:0 20px}
+.ruled td{color:var(--ink2)}
+.ruled td.m{color:var(--ink)}
+.more{font-family:var(--m);font-size:10.5px;color:var(--ink3);padding-top:7px}
+
+.draft{font-family:var(--m);font-size:12.5px;line-height:1.65;white-space:pre-wrap;
+  background:var(--panel2);border:1px solid var(--line);border-radius:3px;
+  padding:14px 16px}
+.lock{font-family:var(--m);font-size:9.5px;letter-spacing:.1em;color:var(--green);
+  text-transform:uppercase;margin-top:8px}
+.lock.bad{color:var(--red)}
+
+.refuse-b .h{font-family:var(--d);font-size:18px;font-weight:700;color:var(--amber);
+  margin-bottom:7px}
+.refuse-b .row{font-size:13px;color:var(--ink2);margin-bottom:4px}
+.refuse-b .row b{color:var(--ink);font-weight:600}
+.chip{display:inline-block;font-family:var(--m);font-size:11px;padding:3px 8px;
+  border:1px solid var(--line2);border-radius:3px;margin:5px 5px 0 0;
+  color:var(--ink2);transition:border-color .15s,color .15s}
+.chip:hover{border-color:var(--cyan);color:var(--cyan)}
+
+.foot{border-top:1px solid var(--line);background:var(--panel2);padding:8px 20px;
+  display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-family:var(--m);
+  font-size:9.5px;letter-spacing:.07em;color:var(--ink3);text-transform:uppercase}
+.foot button{color:var(--ink3);transition:color .15s}
+.foot button:hover{color:var(--cyan)}
+
+#composer{border-top:1px solid var(--line);background:var(--panel);padding:13px 26px 15px}
+#cwrap{max-width:840px;margin:0 auto;display:flex;gap:9px;align-items:center}
+#q{flex:1;background:var(--panel2);border:1px solid var(--line2);border-radius:4px;
+  padding:12px 15px;color:var(--ink);font:inherit;font-size:14.5px;
+  transition:border-color .18s,box-shadow .18s}
+#q:focus{outline:0;border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-dim)}
+#q::placeholder{color:var(--ink3)}
+#send{background:var(--cyan);color:#04161f;font-weight:600;border-radius:4px;
+  padding:12px 20px;font-family:var(--d);transition:transform .14s var(--ez),opacity .15s}
+:root[data-theme="light"] #send{color:#fff}
+#send:hover:not(:disabled){transform:translateY(-1px)}
+#send:disabled{opacity:.4;cursor:default}
+#hint{max-width:840px;margin:7px auto 0;font-family:var(--m);font-size:9.5px;
+  letter-spacing:.06em;color:var(--ink3);text-transform:uppercase;display:flex;
+  gap:14px;flex-wrap:wrap}
+kbd{font-family:var(--m);background:var(--panel3);border:1px solid var(--line2);
+  border-radius:2px;padding:0 4px;color:var(--ink2)}
+
+#evi{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;
+  padding:16px 16px 40px}
+#evi table{font-size:11.5px}
+#evi td{padding:5px 7px}
+.ev-src{font-family:var(--m);font-size:10px;color:var(--ink3);line-height:1.4}
+.ev-empty{color:var(--ink3);font-size:12.5px;padding:16px 0}
+
+.spin{display:inline-block;width:11px;height:11px;border:1.5px solid var(--line2);
+  border-top-color:var(--cyan);border-radius:50%;animation:sp .7s linear infinite;
+  vertical-align:-1px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;transition-duration:.001ms !important}
+  #feed{scroll-behavior:auto}
+}
+</style></head>
+<body>
+<div id="app">
+  <div id="bar">
+    <span><b>dCORTEX AIR</b> &middot; CREW OPS</span>
+    <span class="sep"></span>
+    <span id="mode">LIVE</span>
+    <span class="sep"></span>
+    <span>SNAP <b>2026-09-14 18:00Z</b></span>
+    <span id="fleet">&middot; &middot; &middot;</span>
+    <span id="score">
+      <span id="llm"><span class="led off"></span>MODEL</span>
+      <span class="sep"></span>
+      <span id="scoreboard">SCOREBOARD <span class="spin"></span></span>
+      <button id="themeBtn" title="Toggle theme">&#9689;</button>
+    </span>
+  </div>
+
+  <div id="cols">
+    <aside id="board">
+      <div class="grp"><h2>Already illegal</h2><div id="alerts"></div></div>
+      <div class="grp"><h2>Thinnest cover</h2><div id="frags"></div></div>
+      <div class="grp"><h2>No standby cover</h2><div id="gaps"></div></div>
+      <div class="grp"><h2>Try one</h2><div id="examples"></div></div>
+    </aside>
+
+    <main id="desk">
+      <div id="feed"><div id="feedInner">
+        <div id="hero">
+          <h1>Who flies DX412?</h1>
+          <p>It's 5 a.m. and a captain just called in sick. Ask in plain language &mdash;
+             <span class="k">the model translates, the kernel decides.</span>
+             Every number below is computed, never written.</p>
+        </div>
+      </div></div>
+      <div id="composer">
+        <div id="cwrap">
+          <input id="q" autocomplete="off" spellcheck="false"
+            placeholder="Captain C-1042 just called in sick for tomorrow &mdash; which flights are now uncrewed?">
+          <button id="send">Ask</button>
+        </div>
+        <div id="hint">
+          <span><kbd>/</kbd> focus</span><span><kbd>E</kbd> evidence</span>
+          <span><kbd>Esc</kbd> exit what-if</span><span><kbd>&uarr;</kbd> last question</span>
+        </div>
+      </div>
+    </main>
+
+    <aside id="evi">
+      <div class="grp"><h2>Evidence ledger</h2>
+        <div id="eviBody" class="ev-empty">Every number the rules engine touched,
+          including the intermediates. This is what the narrator is allowed to
+          say &mdash; and nothing else.</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const el = (t,c,h) => { const n=document.createElement(t); if(c)n.className=c;
+                        if(h!==undefined)n.innerHTML=h; return n; };
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,
+              c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const inr = n => '₹' + Number(n).toLocaleString('en-IN');
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* Motion via the Web Animations API only. No runtime dependency, on purpose:
+   a live demo must not be able to fail because a CDN is slow. */
+function enter(node,i){ if(REDUCED) return;
+  node.animate([{opacity:0,transform:'translateY(9px)'},{opacity:1,transform:'none'}],
+    {duration:420,delay:(i||0)*32,easing:'cubic-bezier(.22,1.2,.36,1)',fill:'backwards'}); }
+function stagger(nodes,step){ if(REDUCED) return;
+  [].forEach.call(nodes,(n,i)=>n.animate(
+    [{opacity:0,transform:'translateX(-6px)'},{opacity:1,transform:'none'}],
+    {duration:300,delay:i*(step||26),easing:'cubic-bezier(.4,0,.2,1)',fill:'backwards'})); }
+function countUp(node,to,fmt){
+  if(REDUCED||!isFinite(to)){ node.textContent=fmt(to); return; }
+  const t0=performance.now();
+  (function tick(t){ const p=Math.min(1,(t-t0)/620), e=1-Math.pow(1-p,3);
+    node.textContent=fmt(to*e);
+    if(p<1) requestAnimationFrame(tick); else node.textContent=fmt(to); })(t0);
+}
+function grow(node,pct){
+  if(REDUCED){ node.style.width=pct+'%'; return; }
+  node.animate([{width:'0%'},{width:pct+'%'}],
+    {duration:700,easing:'cubic-bezier(.22,1.2,.36,1)',fill:'forwards'});
+}
+
+const SESSION = 'ui-' + Math.random().toString(36).slice(2,10);
+let HISTORY = [], HIST_I = -1, WHATIF = [];
+
+fetch('/api/health').then(r=>r.json()).then(d=>{
+  $('#fleet').textContent = '· '+d.flights+' FLIGHTS · '+d.crew+' CREW · '+d.pairings+' TRIPS';
+  $('#llm').innerHTML = d.model
+    ? '<span class="led"></span>'+esc(String(d.model).split(':')[0].toUpperCase())
+    : '<span class="led off"></span>RULES ONLY';
+}).catch(()=>{});
+
+fetch('/api/eval').then(r=>r.json()).then(d=>{
+  const t=d.totals;
+  $('#scoreboard').innerHTML = '<b>'+t.CORRECT+'</b> CORRECT · <span class="'+
+    (t.WRONG?'':'wrong0')+'"><b>'+t.WRONG+'</b> WRONG</span>';
+}).catch(()=>{ $('#scoreboard').textContent='SCOREBOARD —'; });
+
+fetch('/api/brief').then(r=>r.json()).then(renderBoard).catch(()=>{});
+fetch('/api/examples').then(r=>r.json()).then(renderExamples).catch(()=>{});
+
+function renderBoard(b){
+  const A=$('#alerts');
+  (b.already_illegal||[]).forEach((x,i)=>{
+    const n=el('div','alert',
+      '<div class="t">'+esc(x.rule)+' · AS ROSTERED</div>'+
+      '<div class="b">'+esc(x.crew_id)+' — '+esc(x.role)+' on '+esc(x.date)+'</div>'+
+      '<div class="s">'+esc(x.pairing_id)+' · '+esc(x.detail)+'</div>');
+    A.appendChild(n); enter(n,i);
+  });
+  if(!(b.already_illegal||[]).length)
+    A.appendChild(el('div','ev-empty','Nothing illegal as rostered.'));
+
+  const F=$('#frags');
+  (b.fragility||[]).slice(0,6).forEach((r,i)=>{
+    const cls = r.legal_covers<=1?'crit':(r.legal_covers<=2?'warn':'ok');
+    const n=el('button','frag',
+      '<span class="n '+cls+'">'+r.legal_covers+'</span>'+
+      '<span class="id">'+esc(r.pairing_id)+'</span>'+
+      '<span class="r">'+esc(short(r.role))+' · '+esc(r.date.slice(5))+'</span>');
+    n.title = r.legal_covers+' legal cover(s): '+((r.candidates||[]).join(', ')||'none');
+    n.onclick = ()=>ask(r.rostered+' is out for '+r.pairing_id+', what should I do?');
+    F.appendChild(n); enter(n,i);
+  });
+
+  const G=$('#gaps');
+  (b.reserve_gaps||[]).filter(g=>g.who.indexOf('Captain')===0).forEach((g,i)=>{
+    const set={}; g.hours.forEach(h=>set[h]=1);
+    const bar=el('div','gapbar');
+    for(let h=0;h<24;h++){ const c=el('i'); if(set[h]) c.className='x';
+      c.title=(h<10?'0':'')+h+':00Z '+(set[h]?'no standby':'covered'); bar.appendChild(c); }
+    const box=el('div');
+    box.appendChild(el('div','gaplbl','<span>'+esc(g.who.replace('Captain / ',''))+
+      '</span><span>'+g.hours.length+'H UNCOVERED</span>'));
+    box.appendChild(bar);
+    box.appendChild(el('div','gaplbl','<span>00Z</span><span>12Z</span><span>23Z</span>'));
+    box.style.marginBottom='11px';
+    G.appendChild(box); enter(box,i);
+  });
+}
+
+function renderExamples(list){
+  const E=$('#examples');
+  const cls = t => t==='T1'?'t1':t==='T2'?'t2':t==='T3'?'t3':'t4';
+  list.forEach((x,i)=>{
+    const b=el('button','ex','<span class="tg '+cls(x.tier)+'">'+x.tier+'</span>'+esc(x.q));
+    b.onclick=()=>ask(x.q); E.appendChild(b); enter(b,i);
+  });
+}
+
+$('#send').onclick = ()=>ask($('#q').value);
+$('#q').addEventListener('keydown', e=>{
+  if(e.key==='Enter') ask($('#q').value);
+  else if(e.key==='ArrowUp' && !$('#q').value){
+    HIST_I=Math.max(0,HIST_I-1); if(HISTORY[HIST_I]) $('#q').value=HISTORY[HIST_I]; }
+});
+addEventListener('keydown', e=>{
+  if(e.key==='/' && document.activeElement!==$('#q')){ e.preventDefault(); $('#q').focus(); }
+  else if(e.key==='Escape'){ if(WHATIF.length) resetWhatIf(); else $('#q').blur(); }
+  else if((e.key==='e'||e.key==='E') && document.activeElement!==$('#q'))
+    $('#cols').classList.toggle('ev');
+});
+$('#themeBtn').onclick = ()=>{ const r=document.documentElement;
+  r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'; };
+
+async function ask(q){
+  q=(q||'').trim(); if(!q) return;
+  HISTORY.push(q); HIST_I=HISTORY.length;
+  $('#q').value=''; $('#send').disabled=true;
+
+  const turn=el('div','turn');
+  turn.appendChild(el('div','you',esc(q)));
+  const card=el('div','card');
+  card.appendChild(el('div','body','<span class="spin"></span> <span style="'+
+    'font-family:var(--m);font-size:11px;color:var(--ink3);letter-spacing:.08em">PLANNING…</span>'));
+  turn.appendChild(card);
+  $('#feedInner').appendChild(turn); enter(turn);
+  $('#feed').scrollTop=$('#feed').scrollHeight;
+
+  let d;
+  try{
+    const r=await fetch('/api/ask',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({q:q, session:SESSION})});
+    d=await r.json();
+  }catch(err){ d={error:String(err)}; }
+
+  card.innerHTML='';
+  renderCard(card,d);
+  renderEvidence(d);
+  $('#send').disabled=false;
+  $('#feed').scrollTop=$('#feed').scrollHeight;
+  $('#q').focus();
+}
+
+function renderCard(card,d){
+  const body=el('div','body'); card.appendChild(body);
+
+  if(d.error){ card.className='card refuse';
+    body.appendChild(el('div','refuse-b','<div class="h">Something broke</div>'+
+      '<div class="row">'+esc(d.error)+'</div>')); return; }
+
+  if(d.answer_type==='refusal'){
+    card.className='card refuse';
+    const heads={PARSE_FAIL:"I didn't understand that",CLARIFY:'I need one more detail',
+      DATA_GAP:"That isn't in this dataset",OUT_OF_RANGE:'That date is outside my data',
+      UNKNOWN_ENTITY:"I don't know that one"};
+    const b=el('div','refuse-b',
+      '<div class="h">'+esc(heads[d.kind]||"I can't answer that reliably")+'</div>'+
+      '<div class="row">'+esc(d.message)+'</div>'+
+      (d.have?'<div class="row"><b>What I do have:</b> '+esc(d.have)+'</div>':'')+
+      (d.would_need?'<div class="row"><b>What it would need:</b> '+esc(d.would_need)+'</div>':''));
+    (d.suggestions||[]).forEach(s=>{ const c=el('button','chip',esc(s));
+      c.onclick=()=>{ $('#q').value=s; $('#q').focus(); }; b.appendChild(c); });
+    body.appendChild(b);
+    body.appendChild(el('div','tags','<span class="tag md">'+esc(d.kind)+'</span>'+
+      '<span>'+Math.round(d.elapsed_ms)+' MS</span><span>REFUSED, NOT GUESSED</span>'));
+    return;
+  }
+
+  const p=d.result||{}, tool=d.plan?d.plan.tool:'?';
+  const computed = d.explanation_source!=='model';
+  if(tool==='check_legality') card.className='card '+(p.legal?'yes':'no');
+  if(tool==='draft_notification') card.className='card drafted';
+
+  body.appendChild(el('div','lede',esc(d.explanation)));
+
+  const steps=(d.plan&&d.plan.steps)||[];
+  body.appendChild(el('div','tags',
+    '<span class="tag hi">T'+d.tier+'</span>'+
+    '<span class="tag">'+esc(tool)+'</span>'+
+    (steps.length>1?'<span class="tag pv">'+steps.length+'-STEP CHAIN</span>':'')+
+    '<span>'+Math.round(d.elapsed_ms)+' MS</span>'+
+    '<span class="tag '+(computed?'hi':'md')+'">'+(computed?'COMPUTED':'MODEL-DRAFTED')+'</span>'+
+    '<span>PLANNED BY '+esc(String((d.plan&&d.plan.parsed_by)||'-').toUpperCase())+'</span>'+
+    '<span class="tag '+(d.confidence==='high'?'hi':(d.confidence==='provided'?'pv':'md'))+
+      '" title="'+esc(d.confidence_why||'')+'">'+esc(String(d.confidence||'').toUpperCase())+'</span>'));
+
+  ((d.resolved&&d.resolved.assumptions)||[]).forEach(a=>
+    body.appendChild(el('div','assume','ASSUMED · '+esc(a))));
+
+  if(steps.length>1){
+    body.appendChild(el('div','sect','Plan'));
+    const t=el('table'); t.innerHTML='<tbody>'+steps.map((s,i)=>
+      '<tr><td class="m">'+(i+1)+'</td><td class="m">'+esc(s.tool)+'</td><td>'+
+      esc(JSON.stringify(s.args))+'</td></tr>').join('')+'</tbody>';
+    body.appendChild(t); stagger(t.querySelectorAll('tr'));
+  }
+
+  if(RENDER[tool]) RENDER[tool](body,p,d);
+
+  const foot=el('div','foot');
+  foot.appendChild(el('span','', 'EVIDENCE '+((d.evidence||[]).length)+' FACTS'));
+  const be=el('button','','OPEN LEDGER');
+  be.onclick=()=>{ renderEvidence(d); $('#cols').classList.add('ev'); };
+  foot.appendChild(be);
+  const bj=el('button','','RAW JSON');
+  bj.onclick=()=>{ const pre=el('pre'); pre.style.cssText='font-family:var(--m);'+
+    'font-size:10.5px;background:var(--panel2);padding:12px;border-radius:3px;'+
+    'overflow:auto;margin-top:10px;max-height:320px';
+    pre.textContent=JSON.stringify(d,null,2); body.appendChild(pre); enter(pre); };
+  foot.appendChild(bj);
+  card.appendChild(foot);
+}
+
+const RENDER={};
+
+RENDER.check_legality=(b,p,d)=>{
+  const v=el('div','verdict '+(p.legal?'yes':'no'),
+    '<span class="gl">'+(p.legal?'✓':'✕')+'</span>'+(p.legal?'LEGAL':'NOT LEGAL'));
+  b.appendChild(v); enter(v);
+  const tot=evNum(d,'duty_7d_total'), cap=evNum(d,'duty_cap_hours');
+  if(tot&&cap){
+    const over=tot>cap;
+    b.appendChild(el('div','bind',
+      '<span><span class="l">RULE</span><span class="v">RULE-DUTY-02</span></span>'+
+      '<span><span class="l">WOULD WORK</span><span class="v '+(over?'bad':'')+'">'+tot.toFixed(2)+' h</span></span>'+
+      '<span><span class="l">LIMIT</span><span class="v">'+cap.toFixed(2)+' h</span></span>'+
+      (over?'<span><span class="l">OVER BY</span><span class="v bad">'+hm(tot-cap)+'</span></span>'
+           :'<span><span class="l">HEADROOM</span><span class="v">'+(cap-tot).toFixed(2)+' h</span></span>')));
+    const g=el('div','gauge','<i class="fill"></i><i class="over"></i><i class="tick"></i>');
+    b.appendChild(g);
+    const w=Math.min(100, cap/Math.max(tot,cap)*100);
+    grow(g.querySelector('.fill'), w);
+    g.querySelector('.tick').style.left=w+'%';
+    if(over){ const o=g.querySelector('.over'); o.style.left=w+'%'; grow(o,100-w); }
+  }
+  (p.issues||[]).forEach((i,k)=>{ const n=el('div','issue',esc(i)); b.appendChild(n); enter(n,k); });
+  if(p.consequence) b.appendChild(el('div','assume',esc(p.consequence)));
+  if((p.non_binding||[]).length) b.appendChild(el('div','tags',
+    '<span>'+esc(p.non_binding.join(', '))+': EVALUATED, NON-BINDING ON THIS DATA</span>'));
+};
+
+RENDER.rank_cover_options=(b,p)=>{
+  b.appendChild(el('div','sect','Options · equal cost means equal rank'));
+  const w=el('div','scrollx'), t=el('table');
+  t.innerHTML='<thead><tr><th>#</th><th>crew</th><th>cost</th><th>tie</th>'+
+    '<th>reach</th><th>action</th><th></th></tr></thead>';
+  const tb=el('tbody');
+  (p.options||[]).slice(0,8).forEach(o=>{
+    const tr=el('tr', o.rank===1?'win':(o.crew_id?'':'bad'));
+    tr.innerHTML='<td class="m">'+o.rank+'</td><td class="m">'+esc(o.crew_id||'—')+'</td>'+
+      '<td class="n cost">'+inr(o.cost_inr)+'</td>'+
+      '<td class="m"><span class="tie">'+o.tie_band+'</span></td>'+
+      '<td class="n">'+(o.reachability_minutes?o.reachability_minutes+'m':'—')+'</td>'+
+      '<td>'+esc(o.action)+'</td><td></td>';
+    if(o.crew_id){ const wb=el('button','wbtn','WHAT-IF');
+      wb.title='Make '+o.crew_id+' unavailable too, then re-ask';
+      wb.onclick=()=>pushWhatIf(o.crew_id);
+      tr.lastChild.appendChild(wb); }
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); w.appendChild(t); b.appendChild(w);
+  stagger(tb.querySelectorAll('tr'));
+  const c=tb.querySelector('.win .cost');
+  if(c && p.options[0]) countUp(c,p.options[0].cost_inr,x=>inr(Math.round(x)));
+
+  const ex=p.excluded_candidates||[];
+  if(ex.length){
+    b.appendChild(el('div','sect','Ruled out ('+ex.length+
+      ') — the first question a controller asks'));
+    const w2=el('div','scrollx'), t2=el('table','ruled'), tb2=el('tbody');
+    ex.slice(0,7).forEach(e=>{ const tr=el('tr');
+      tr.innerHTML='<td class="m">'+esc(e.crew_id)+'</td><td>'+esc(e.reason)+'</td>';
+      tb2.appendChild(tr); });
+    t2.appendChild(tb2); w2.appendChild(t2); b.appendChild(w2);
+    stagger(tb2.querySelectorAll('tr'),22);
+    if(ex.length>7) b.appendChild(el('div','more','… and '+(ex.length-7)+' more'));
+  }
+};
+
+RENDER.simulate_crew_unavailable=(b,p)=>{
+  b.appendChild(el('div','sect','Blast radius'));
+  const t=el('table'), tb=el('tbody');
+  t.innerHTML='<thead><tr><th>date</th><th>uncrewed</th><th>legs</th><th>seats</th></tr></thead>';
+  Object.keys(p.uncovered_by_day||{}).sort().forEach(dt=>{
+    const fl=p.uncovered_by_day[dt], tr=el('tr');
+    tr.innerHTML='<td class="m">'+esc(dt)+'</td><td class="m">'+
+      fl.map(f=>esc(f.split('-')[0])).join(', ')+'</td><td class="n">'+fl.length+
+      '</td><td class="n">'+((p.seats_by_day||{})[dt]||'—')+'</td>';
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); b.appendChild(t); stagger(tb.querySelectorAll('tr'));
+  b.appendChild(el('div','tags','<span class="tag hi">'+p.passengers_at_risk_day1+
+    ' SEATS DAY ONE</span>'+(p.overnight_station?'<span>OVERNIGHTS AT '+
+    esc(p.overnight_station)+'</span>':'')+'<span>SEATS = CAPACITY, NOT BOOKINGS</span>'));
+};
+
+RENDER.simulate_station_closure=(b,p)=>{
+  b.appendChild(el('div','sect','Per-flight assessment'));
+  const w=el('div','scrollx'), t=el('table'), tb=el('tbody');
+  t.innerHTML='<thead><tr><th>flight</th><th>trip</th><th>min delay</th>'+
+    '<th>FDP / limit</th><th>crew</th></tr></thead>';
+  (p.per_flight_assessment||[]).forEach(r=>{
+    const tr=el('tr', r.feasible?'':'bad');
+    tr.innerHTML='<td class="m">'+esc(r.flight_no)+'</td><td class="m">'+esc(r.pairing_id)+
+      '</td><td class="n">+'+r.min_delay_hours+'h</td><td class="n">'+
+      r.crew_fdp_after_delay+' / '+r.fdp_limit+'</td><td class="m">'+
+      (r.feasible?'ok':'EXCEEDS FDP')+'</td>';
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); w.appendChild(t); b.appendChild(w);
+  stagger(tb.querySelectorAll('tr'),18);
+  const bad=(p.per_flight_assessment||[]).filter(r=>!r.feasible).length;
+  b.appendChild(el('div','tags','<span class="tag hi">'+(p.affected_flights||[]).length+
+    ' FLIGHTS HIT</span><span class="tag '+(bad?'md':'')+'">'+bad+
+    ' EXCEED CREW FDP</span><span>'+p.seats_at_risk+' SEATS</span>'));
+};
+
+RENDER.simulate_delay=(b,p)=>{
+  if(p.breach){
+    const v=el('div','verdict no','<span class="gl">✕</span>FDP BREACH');
+    b.appendChild(v); enter(v);
+    b.appendChild(el('div','bind',
+      '<span><span class="l">AFTER DELAY</span><span class="v bad">'+p.fdp_after_delay+' h</span></span>'+
+      '<span><span class="l">LIMIT</span><span class="v">'+p.fdp_limit+' h</span></span>'+
+      '<span><span class="l">SECTORS</span><span class="v">'+p.sectors+'</span></span>'));
+  }
+  const pre=p.max_legal_prefix||{};
+  if(pre.legs) b.appendChild(el('div','issue','Original crew can still operate '+
+    pre.legs.length+' of '+p.sectors+' legs (FDP '+pre.fdp+'h vs '+pre.limit+
+    'h). Re-crew: '+((pre.legs_to_shed||[]).map(x=>esc(x.split('-')[0])).join(', ')||'none')+'.'));
+};
+
+RENDER.minimal_repair=(b,p)=>{
+  if(p.already_legal) return;
+  b.appendChild(el('div','sect','What "yes" would cost'));
+  (p.repairs||[]).forEach((r,i)=>{
+    const n=el('div','issue','<b>'+esc(r.rule)+'</b> — short by '+
+      (r.shortfall_hours==null?'—':r.shortfall_hours+'h')+'<br>'+esc(r.lever));
+    b.appendChild(n); enter(n,i);
+  });
+};
+
+RENDER.cover_fragility=(b,p)=>{
+  b.appendChild(el('div','sect','Cover depth across the week'));
+  const t=el('table'), tb=el('tbody');
+  t.innerHTML='<thead><tr><th>trip</th><th>date</th><th>role</th><th>covers</th><th>who</th></tr></thead>';
+  (p.rows||[]).slice(0,8).forEach(r=>{
+    const tr=el('tr', r.legal_covers<=1?'bad':'');
+    tr.innerHTML='<td class="m">'+esc(r.pairing_id)+'</td><td class="m">'+esc(r.date)+
+      '</td><td>'+esc(r.role)+'</td><td class="n">'+r.legal_covers+'</td><td class="m">'+
+      esc((r.candidates||[]).join(', ')||'none')+'</td>';
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); b.appendChild(t); stagger(tb.querySelectorAll('tr'));
+};
+
+RENDER.draft_notification=(b,p)=>{
+  b.appendChild(el('div','sect','Draft · '+esc(p.audience)));
+  const d=el('div','draft',esc(p.draft)); b.appendChild(d); enter(d);
+  b.appendChild(el('div','lock'+(p.fact_locked?'':' bad'),
+    p.fact_locked ? '✓ FACT-LOCKED — every id, date and time traced to the packet'
+                  : '✕ UNVERIFIED: '+esc((p.unverified_tokens||[]).join(', '))));
+  const cl=p.coverage_checklist||{};
+  b.appendChild(el('div','tags', Object.keys(cl).map(k=>'<span class="tag '+
+    (cl[k]?'hi':'')+'">'+(cl[k]?'✓':'—')+' '+
+    esc(k.replace(/_/g,' ').toUpperCase())+'</span>').join('')));
+};
+
+RENDER.latent_breaches=(b,p)=>{
+  if(!p.count){ b.appendChild(el('div','tags','<span>NOTHING ILLEGAL AS ROSTERED</span>')); return; }
+  b.appendChild(el('div','sect','Found without being asked'));
+  (p.breaches||[]).forEach((x,i)=>{
+    const n=el('div','issue',esc(x.crew_id)+' ('+esc(x.role)+') on '+esc(x.date)+
+      ' · '+esc(x.pairing_id)+' · '+esc(x.rule)+' — '+esc(x.detail));
+    b.appendChild(n); enter(n,i);
+  });
+};
+
+RENDER.solve_joint_cover=(b,p)=>{
+  b.appendChild(el('div','sect','Joint plan'));
+  const t=el('table'), tb=el('tbody');
+  t.innerHTML='<thead><tr><th>trip</th><th>assigned</th><th>cost</th></tr></thead>';
+  Object.keys(p.assignments||{}).forEach(k=>{
+    const o=p.assignments[k], tr=el('tr','win');
+    tr.innerHTML='<td class="m">'+esc(k)+'</td><td class="m">'+esc(o.crew_id||'cancel')+
+      '</td><td class="n">'+inr(o.cost_inr)+'</td>';
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); b.appendChild(t); stagger(tb.querySelectorAll('tr'));
+  b.appendChild(el('div','tags','<span class="tag hi">TOTAL '+inr(p.total_cost_inr)+
+    '</span><span class="tag '+(p.proven_optimal?'hi':'md')+'">'+
+    (p.proven_optimal?'PROVEN OPTIMAL':'LEGAL, NOT PROVEN OPTIMAL')+
+    '</span><span>NO CREW ASSIGNED TWICE</span>'));
+};
+
+RENDER.reserve_gaps=(b,p)=>{
+  b.appendChild(el('div','sect','Hours with no standby'));
+  (p.gaps||[]).forEach((g,i)=>{
+    const n=el('div','issue','<b>'+esc(g.who)+'</b> — '+
+      g.uncovered_hours_utc.length+'h uncovered: '+runs(g.uncovered_hours_utc));
+    b.appendChild(n); enter(n,i);
+  });
+};
+
+RENDER.duty_hours=(b,p)=>{
+  if(p.count===1){
+    const r=p.rows[0];
+    b.appendChild(el('div','bind',
+      '<span><span class="l">ACCRUED</span><span class="v">'+r.hours+' h</span></span>'+
+      '<span><span class="l">LIMIT</span><span class="v">'+p.limit+' h</span></span>'+
+      '<span><span class="l">HEADROOM</span><span class="v">'+r.headroom_hours+' h</span></span>'+
+      '<span><span class="l">WINDOW</span><span class="v">'+p.window_days+'D TO '+esc(p.end_date)+'</span></span>'));
+    const g=el('div','gauge','<i class="fill"></i>'); b.appendChild(g);
+    grow(g.querySelector('.fill'), Math.min(100, r.hours/p.limit*100));
+    return;
+  }
+  const t=el('table'), tb=el('tbody');
+  t.innerHTML='<thead><tr><th>crew</th><th>hours</th><th>headroom</th></tr></thead>';
+  (p.rows||[]).slice(0,12).forEach(r=>{ const tr=el('tr');
+    tr.innerHTML='<td class="m">'+esc(r.crew_id)+'</td><td class="n">'+r.hours+
+      '</td><td class="n">'+r.headroom_hours+'</td>'; tb.appendChild(tr); });
+  t.appendChild(tb); b.appendChild(t); stagger(tb.querySelectorAll('tr'));
+};
+
+RENDER.get_roster=(b,p)=>{
+  (p.pairings||[]).slice(0,3).forEach(pp=>{
+    b.appendChild(el('div','sect',esc(pp.pairing_id)+' · '+esc(pp.aircraft)+
+      ' · '+esc(pp.aircraft_type)));
+    const t=el('table'), tb=el('tbody');
+    t.innerHTML='<thead><tr><th>date</th><th>flights</th><th>report</th><th>release</th></tr></thead>';
+    pp.days.forEach(dy=>{ const tr=el('tr');
+      tr.innerHTML='<td class="m">'+esc(dy.date)+'</td><td class="m">'+
+        dy.flights.map(f=>esc(f.split('-')[0])).join(', ')+'</td><td class="n">'+
+        esc(dy.report_utc.slice(11,16))+'Z</td><td class="n">'+
+        esc(dy.release_utc.slice(11,16))+'Z</td>';
+      tb.appendChild(tr); });
+    t.appendChild(tb); b.appendChild(t); stagger(tb.querySelectorAll('tr'));
+    b.appendChild(el('div','tags', pp.crew.map(c=>'<span class="tag">'+
+      esc(c.crew_id)+' '+esc(short(c.role))+'</span>').join('')));
+  });
+};
+
+const SIMPLE={
+  get_reserves:[p=>p.reserves,['crew','rank','base','window','reach'],
+    r=>[r.crew_id,r.rank,r.base,r.window.start+'–'+r.window.end+'Z',r.reachability_minutes+'m']],
+  find_crew:[p=>p.rows,['crew','name','rank','base','ratings'],
+    r=>[r.crew_id,r.name,r.rank,r.base,(r.ratings||[]).join('/')]],
+  find_flights:[p=>p.rows,['flight','date','from','to','dep','block','seats'],
+    r=>[r.flight_no,r.date,r.dep_station,r.arr_station,r.dep_utc.slice(11,16)+'Z',r.block_hours,r.seats]],
+  get_certifications:[p=>p.certifications,['crew','type','valid to'],
+    r=>[r.crew_id,r.cert_type,r.valid_to]],
+  get_risk_signals:[p=>p.signals,['crew','score','drivers'],
+    r=>[r.crew_id,r.score,(r.drivers||[]).join('; ')]],
+};
+Object.keys(SIMPLE).forEach(tool=>{
+  const pick=SIMPLE[tool][0], heads=SIMPLE[tool][1], row=SIMPLE[tool][2];
+  RENDER[tool]=(b,p)=>{
+    const all=pick(p)||[], rows=all.slice(0,14);
+    if(!rows.length) return;
+    const w=el('div','scrollx'), t=el('table'), tb=el('tbody');
+    t.innerHTML='<thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead>';
+    rows.forEach(r=>{ const tr=el('tr');
+      tr.innerHTML=row(r).map((c,i)=>'<td class="'+(i?'':'m')+'">'+esc(c)+'</td>').join('');
+      tb.appendChild(tr); });
+    t.appendChild(tb); w.appendChild(t); b.appendChild(w);
+    stagger(tb.querySelectorAll('tr'),16);
+    if(all.length>14) b.appendChild(el('div','more','… and '+(all.length-14)+' more'));
+  };
+});
+
+async function pushWhatIf(crewId){
+  try{
+    await fetch('/api/whatif',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session:SESSION, crew_id:crewId})});
+  }catch(e){ return; }
+  WHATIF.push(crewId);
+  $('#mode').textContent='WHAT-IF · '+WHATIF.join(' + ')+' OUT';
+  $('#mode').classList.add('whatif');
+  const last=HISTORY[HISTORY.length-1];
+  if(last) ask(last);
+}
+async function resetWhatIf(){
+  try{ await fetch('/api/reset',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({session:SESSION})}); }catch(e){}
+  WHATIF=[];
+  $('#mode').textContent='LIVE'; $('#mode').classList.remove('whatif');
+  const n=el('div','turn');
+  n.appendChild(el('div','you','↺ what-if cleared — back to the live snapshot'));
+  $('#feedInner').appendChild(n); enter(n);
+  $('#feed').scrollTop=$('#feed').scrollHeight;
+}
+
+function renderEvidence(d){
+  const box=$('#eviBody'), facts=d.evidence||[];
+  if(!facts.length){ box.className='ev-empty';
+    box.textContent='No computed facts for this answer.'; return; }
+  box.className=''; box.innerHTML='';
+  const t=el('table'), tb=el('tbody');
+  t.innerHTML='<thead><tr><th>fact</th><th>value</th></tr></thead>';
+  facts.forEach(f=>{ const tr=el('tr');
+    tr.innerHTML='<td class="m">'+esc(f.key)+'</td><td class="n">'+esc(f.value)+' '+
+      esc(f.unit||'')+((f.derivation||f.source)?'<div class="ev-src">'+
+      esc(f.derivation||f.source)+'</div>':'')+'</td>';
+    tb.appendChild(tr); });
+  t.appendChild(tb); box.appendChild(t); stagger(tb.querySelectorAll('tr'),12);
+}
+function evNum(d,prefix){
+  const f=(d.evidence||[]).find(x=>x.key.indexOf(prefix)===0);
+  return f?Number(f.value):null;
+}
+function hm(h){ const H=Math.floor(h), M=Math.round((h-H)*60);
+  return H+'h'+(M<10?'0':'')+M+'m'; }
+function short(role){ return String(role).replace('First Officer','FO')
+  .replace('Senior Cabin Crew','SCC').replace('Cabin Crew','CC'); }
+function runs(hrs){
+  if(!hrs.length) return '—';
+  const out=[]; let s=hrs[0], p=hrs[0];
+  hrs.slice(1).concat([null]).forEach(h=>{
+    if(h===p+1){ p=h; return; }
+    out.push((s<10?'0':'')+s+':00–'+(p<10?'0':'')+p+':59Z');
+    if(h!==null){ s=h; p=h; }
+  });
+  return out.join(', ');
+}
+$('#q').focus();
+</script>
+</body></html>

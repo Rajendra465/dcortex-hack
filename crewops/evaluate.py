@@ -439,6 +439,86 @@ def _heldout_checks(snap: Snapshot) -> list[Check]:
 
 
 # --------------------------------------------------------------------------
+# end-to-end: the shipped prompts through the NATURAL-LANGUAGE layer
+#
+# The harness above calls the tools directly, so it measures the kernel and
+# nothing else. That is a real number but a flattering one: it gives zero
+# coverage of planning, entity extraction or argument binding -- the layer most
+# likely to be wrong. This runs the same prompts the way a controller would
+# type them and reports the gap, because publishing only the kernel score would
+# be exactly the overstatement the brief penalises.
+# --------------------------------------------------------------------------
+
+EXPECTED_TOOL = {
+    "Q01": "get_reserves", "Q02": "duty_hours", "Q03": "find_flights",
+    "Q04": "get_certifications", "Q05": "find_flights", "Q06": "get_reserves",
+    "Q07": "find_crew", "Q08": "get_roster", "Q09": "find_flights",
+    "Q10": "find_flights", "Q11": "find_crew", "Q12": "find_flights",
+    "Q13": "find_crew", "Q14": "find_flights", "Q15": "get_roster",
+    "Q16": "get_risk_signals", "Q17": "simulate_crew_unavailable",
+    "Q18": "check_legality", "Q19": "simulate_station_closure",
+    "Q20": "simulate_delay", "Q21": "check_legality",
+    "Q22": "simulate_cert_expiry", "Q23": "compute_duty_period",
+    "Q24": "check_legality", "Q25": "find_flights", "Q26": "duty_hours",
+    "Q27": "rank_cover_options", "Q28": "check_legality",
+    "Q29": "simulate_station_closure", "Q30": "find_flights",
+    "Q31": "rank_cover_options", "Q32": "solve_joint_cover",
+    "Q33": "simulate_delay", "Q34": "rank_cover_options",
+    "Q35": "simulate_station_closure", "Q36": "draft_notification",
+    "Q37": "rank_cover_options", "Q38": "get_risk_signals",
+}
+
+
+def run_e2e(snap: Snapshot | None = None, data_dir: str | None = None,
+            use_model: bool | None = None) -> dict[str, Any]:
+    """Route every shipped prompt through Advisor.ask and score the tool chosen."""
+    from .agent import Advisor
+    snap = snap or load(data_dir)
+    d = data_dir or os.environ.get("CREWOPS_DATA_DIR") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "extracted", "DCortex - Synthetic dataset", "data")
+    with open(os.path.join(d, "questions.json"), encoding="utf-8") as fh:
+        questions = json.load(fh)
+
+    adv = Advisor(snap, use_model=use_model)
+    rows, ok, refused = [], 0, 0
+    for q in questions:
+        want = EXPECTED_TOOL.get(q["question_id"])
+        t0 = time.perf_counter()
+        a = adv.ask(q["prompt"])
+        ms = (time.perf_counter() - t0) * 1000
+        got = f"REFUSED:{a.refusal.kind}" if a.refusal else a.plan.tool
+        good = got == want
+        ok += good
+        refused += bool(a.refusal)
+        rows.append({"id": q["question_id"], "tier": q["tier"], "want": want,
+                     "got": got, "ok": good, "ms": round(ms, 1),
+                     "by": (a.plan.source if a.plan else "-")})
+    return {"total": len(questions), "correct_tool": ok, "refused": refused,
+            "model": adv.model_label if adv.model_available else None,
+            "rows": rows}
+
+
+def render_e2e(r: dict[str, Any]) -> str:
+    pct = 100.0 * r["correct_tool"] / max(1, r["total"])
+    out = ["", "  END-TO-END THROUGH THE LANGUAGE LAYER",
+           f"  planner: {r['model'] or 'index only (no model configured)'}",
+           "  " + "-" * 54,
+           f"  {r['correct_tool']}/{r['total']} shipped prompts reach the right "
+           f"capability  ({pct:.0f}%)",
+           f"  {r['refused']} refused rather than guessed", ""]
+    wrong = [x for x in r["rows"] if not x["ok"]]
+    if wrong:
+        out.append("  not yet routed:")
+        for x in wrong:
+            out.append(f"    {x['id']}  want {x['want']:<26} got {x['got']}")
+    out += ["", "  The kernel score above measures exact arithmetic; this one",
+            "  measures whether a typed question reaches it. They are different",
+            "  claims and we publish both.", ""]
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------
 # rendering
 # --------------------------------------------------------------------------
 

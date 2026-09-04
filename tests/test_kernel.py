@@ -387,9 +387,15 @@ def test_planner_is_data_driven_not_control_flow():
         assert intent.examples, f"{intent.tool} declares no examples"
         for ex in intent.examples:
             assert _tokens(ex), f"example stems to nothing: {ex!r}"
-        # its own first example must rank it top when entities are satisfied
-        ents = Entities(crew=["C-1042"], pairings=["P-2291"],
-                        stations=["BLR"], hours=1.5)
+        # Give each intent only the entities IT declares it needs. Handing
+        # every intent every entity at once rewards whichever tool happens to
+        # declare the most parameters, which measures nothing.
+        need = set(intent.needs)
+        ents = Entities(
+            crew=["C-1042"] if {"crew", "pairing_or_crew"} & need else [],
+            pairings=["P-2291"] if "pairing_or_crew" in need else [],
+            stations=["BLR"] if "station" in need else [],
+            hours=1.5 if "duration" in need else None)
         ranked = score_intents(intent.examples[0], ents)
         assert ranked and ranked[0][1].tool == intent.tool, (
             f"{intent.tool} not top for its own example "

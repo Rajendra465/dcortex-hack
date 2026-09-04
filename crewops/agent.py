@@ -28,8 +28,9 @@ from typing import Any
 
 from .data import Snapshot
 from .llm import LLM, get_client
-from .orchestrator import (PAT, Entities, Plan, PlanError, execute, extract,
-                           plan_from_index, plan_from_model, validate)
+from .orchestrator import (CONFIDENT, FLOOR, PAT, Entities, Plan, PlanError,
+                           execute, extract, plan_from_index,
+                           plan_from_model, score_intents, validate)
 from .rules import Ledger
 from .tools import REGISTRY, Unanswerable
 
@@ -98,7 +99,12 @@ _LIMIT_PATTERNS = [
                 r"forecast|how likely)", re.I), "prediction"),
     (re.compile(r"\b(phone|call them|contact details|number for|e-?mail|"
                 r"address|how do i reach)", re.I), "contact"),
-    (re.compile(r"\b(weather|storm|fog|wind|metar|turbulence)", re.I), "weather"),
+    # `wind` must not match "window". The prefix style that fixed "probabilit"
+    # cuts the other way here: on-call WINDOWS are core vocabulary, and this
+    # pattern was refusing "who is on reserve and what are their on-call
+    # windows" as a weather question.
+    (re.compile(r"\b(weather|storm|fog|wind(?!ow)|metar|turbulence)", re.I),
+     "weather"),
     (re.compile(r"\b(passenger name|booking|booked|load factor|connecting|"
                 r"connection|pnr|rebook)", re.I), "booking"),
     (re.compile(r"\b(maintenance|defect|serviceab|unserviceab|tech log|aog)",
@@ -398,16 +404,29 @@ class Advisor:
         _, date_notes = resolve_dates(question, self.snap)
         assumptions = list(date_notes)
 
-        plan = plan_from_index(question, ents, self.snap)
+        # The index is trusted only when it is CONFIDENT -- instant and
+        # reproducible for the phrasings a desk uses constantly. Everything
+        # else goes to the model, which is the actual planner. If neither is
+        # sure, we refuse: serving the nearest plausible tool is how an
+        # unrecognised question came back as somebody else's answer.
+        ranked = score_intents(question, ents)
+        top = ranked[0][0] if ranked else 0.0
+
+        plan = None
+        if top >= CONFIDENT:
+            plan = plan_from_index(question, ents, self.snap, CONFIDENT)
         if plan is None and self.client:
             plan = plan_from_model(question, ents, self.client)
+        if plan is None and top >= FLOOR:
+            plan = plan_from_index(question, ents, self.snap, FLOOR)
         if plan is None:
-            r = Refusal("PARSE_FAIL", "I didn't understand that one.",
-                        have="roster and flight lookup, duty hours, "
-                             "certifications, legality checks, disruption "
-                             "impact, ranked cover options, joint recovery, "
-                             "notification drafting and proactive scans",
-                        suggestions=["try naming a crew id, pairing or date"])
+            r = Refusal(
+                "PARSE_FAIL", "I didn't understand that one.",
+                have="roster and flight lookup, duty hours, certifications, "
+                     "legality checks, disruption impact, ranked cover options, "
+                     "joint recovery, notification drafting and proactive scans",
+                suggestions=["name a crew id, pairing, flight or date",
+                             "or say what you want to do: cover, check, impact"])
             return done(refusal=r, prose=r.message)
 
         # 3. validate BEFORE anything executes
