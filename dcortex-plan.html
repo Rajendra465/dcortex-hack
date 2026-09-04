@@ -1,0 +1,976 @@
+<title>The 06:00 Advisor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+:root{
+  --ground:#f2f4f6; --surface:#ffffff; --surface-2:#e9edf1; --surface-3:#dde4ea;
+  --ink:#131920; --ink-2:#4a5865; --ink-3:#71818f;
+  --rule:#d3dae1; --rule-strong:#b6c1cb;
+  --accent:#0f627d; --accent-soft:#e0eef3; --accent-line:#8fbecd;
+  --ok:#2a6b46; --ok-soft:#e2f0e8;
+  --caution:#8f5d09; --caution-soft:#f7edda;
+  --warn:#9f291d; --warn-soft:#f8e5e2;
+  --target:#8a3a80; --target-soft:#f4e6f2;
+  --sans:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --serif:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0c1117; --surface:#141b23; --surface-2:#1a232c; --surface-3:#222e39;
+    --ink:#e7edf2; --ink-2:#98a7b5; --ink-3:#758492;
+    --rule:#28343f; --rule-strong:#3a4954;
+    --accent:#4fbadd; --accent-soft:#10303c; --accent-line:#2c6d84;
+    --ok:#63bd8b; --ok-soft:#122a1e;
+    --caution:#dda545; --caution-soft:#2e2412;
+    --warn:#e87c6e; --warn-soft:#301813;
+    --target:#d193c6; --target-soft:#2b1a29;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0c1117; --surface:#141b23; --surface-2:#1a232c; --surface-3:#222e39;
+  --ink:#e7edf2; --ink-2:#98a7b5; --ink-3:#758492;
+  --rule:#28343f; --rule-strong:#3a4954;
+  --accent:#4fbadd; --accent-soft:#10303c; --accent-line:#2c6d84;
+  --ok:#63bd8b; --ok-soft:#122a1e;
+  --caution:#dda545; --caution-soft:#2e2412;
+  --warn:#e87c6e; --warn-soft:#301813;
+  --target:#d193c6; --target-soft:#2b1a29;
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:var(--serif); font-size:16.5px; line-height:1.62;
+  margin:0; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1120px; margin:0 auto; padding:0 28px 96px}
+.col{max-width:68ch}
+
+/* ---------- status bar ---------- */
+.statusbar{
+  position:sticky; top:0; z-index:40;
+  background:var(--surface); border-bottom:1px solid var(--rule);
+  font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:var(--ink-2);
+}
+.statusbar .inner{
+  max-width:1120px; margin:0 auto; padding:9px 28px;
+  display:flex; flex-wrap:wrap; gap:8px 22px; align-items:center;
+}
+.statusbar b{color:var(--ink); font-weight:600}
+.dot{display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--ok); margin-right:6px; vertical-align:1px}
+
+/* ---------- masthead ---------- */
+.mast{padding:56px 0 40px; border-bottom:2px solid var(--ink)}
+.eyebrow{
+  font-family:var(--sans); font-weight:600; font-size:11.5px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--accent); margin:0 0 18px;
+}
+h1{
+  font-family:var(--sans); font-weight:700; font-size:clamp(38px,6.2vw,66px);
+  line-height:1.02; letter-spacing:-.025em; margin:0 0 20px; text-wrap:balance;
+}
+.standfirst{font-size:20px; line-height:1.5; color:var(--ink-2); margin:0; max-width:60ch}
+.standfirst strong{color:var(--ink); font-weight:600}
+
+/* ---------- verified strip ---------- */
+.strip{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(178px,1fr));
+  border:1px solid var(--rule); border-radius:3px; background:var(--surface);
+  margin:34px 0 0; overflow:hidden;
+}
+.strip div{padding:15px 17px; border-right:1px solid var(--rule)}
+.strip div:last-child{border-right:0}
+.strip .n{
+  font-family:var(--mono); font-weight:600; font-size:24px; letter-spacing:-.02em;
+  color:var(--accent); display:block; line-height:1.1; font-variant-numeric:tabular-nums;
+}
+.strip .l{
+  font-family:var(--sans); font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--ink-3); display:block; margin-top:7px; line-height:1.35;
+}
+
+/* ---------- sections ---------- */
+section{padding:52px 0 0}
+h2{
+  font-family:var(--sans); font-weight:700; font-size:clamp(24px,3.2vw,33px);
+  letter-spacing:-.018em; line-height:1.14; margin:0 0 6px; text-wrap:balance;
+}
+.secnum{
+  font-family:var(--mono); font-size:12px; font-weight:500; color:var(--accent);
+  letter-spacing:.1em; display:block; margin-bottom:10px;
+}
+h3{
+  font-family:var(--sans); font-weight:600; font-size:18.5px; letter-spacing:-.01em;
+  margin:34px 0 10px; text-wrap:balance;
+}
+h4{
+  font-family:var(--sans); font-weight:600; font-size:12px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); margin:26px 0 9px;
+}
+p{margin:0 0 15px}
+a{color:var(--accent)}
+code,.m{font-family:var(--mono); font-size:.87em; font-variant-numeric:tabular-nums}
+code{background:var(--surface-2); padding:1px 5px; border-radius:2px; color:var(--ink)}
+.lede{font-size:18px; color:var(--ink-2); margin-bottom:20px; max-width:64ch}
+ul,ol{margin:0 0 16px; padding-left:22px}
+li{margin-bottom:7px}
+hr{border:0; border-top:1px solid var(--rule); margin:44px 0}
+
+/* ---------- callout ---------- */
+.call{
+  border-left:3px solid var(--accent); background:var(--surface);
+  padding:18px 22px; margin:24px 0; border-radius:0 3px 3px 0;
+}
+.call.warn{border-left-color:var(--warn); background:var(--warn-soft)}
+.call.caution{border-left-color:var(--caution); background:var(--caution-soft)}
+.call.ok{border-left-color:var(--ok); background:var(--ok-soft)}
+.call p:last-child{margin-bottom:0}
+.call .h{
+  font-family:var(--sans); font-weight:600; font-size:11.5px; letter-spacing:.1em;
+  text-transform:uppercase; margin-bottom:7px; color:var(--accent);
+}
+.call.warn .h{color:var(--warn)} .call.caution .h{color:var(--caution)} .call.ok .h{color:var(--ok)}
+
+/* ---------- tables ---------- */
+.scroll{overflow-x:auto; margin:20px 0; border:1px solid var(--rule); border-radius:3px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-family:var(--sans); font-size:13.5px; line-height:1.45}
+th{
+  text-align:left; font-weight:600; font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--ink-3); padding:11px 14px; border-bottom:1px solid var(--rule-strong); white-space:nowrap;
+  background:var(--surface-2);
+}
+td{padding:11px 14px; border-bottom:1px solid var(--rule); vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.mono,th.mono{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+td.num{font-family:var(--mono); text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+
+/* ---------- pills ---------- */
+.pill{
+  display:inline-block; font-family:var(--sans); font-size:10px; font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase; padding:2.5px 7px; border-radius:2px;
+  border:1px solid currentColor; white-space:nowrap;
+}
+.p-must{color:var(--warn); background:var(--warn-soft)}
+.p-should{color:var(--caution); background:var(--caution-soft)}
+.p-if{color:var(--ink-3); background:var(--surface-2)}
+.p-cut{color:var(--ink-3); background:transparent; opacity:.75}
+.p-strong{color:var(--ok); background:transparent}
+
+/* ---------- rung ladder ---------- */
+.ladder{display:flex; flex-direction:column; gap:0; margin:26px 0; border:1px solid var(--rule); border-radius:3px; overflow:hidden; background:var(--surface)}
+.rung{display:grid; grid-template-columns:64px 1fr 88px; gap:0; border-bottom:1px solid var(--rule)}
+.rung:last-child{border-bottom:0}
+.rung .id{
+  font-family:var(--mono); font-weight:600; font-size:14px; color:var(--accent);
+  padding:16px 0 16px 16px; border-right:1px solid var(--rule);
+}
+.rung .body{padding:16px 18px}
+.rung .body b{font-family:var(--sans); font-size:15px; font-weight:600; display:block; margin-bottom:4px}
+.rung .body span{font-size:14.5px; color:var(--ink-2); line-height:1.5}
+.rung .hrs{
+  font-family:var(--mono); font-size:13px; text-align:right; padding:16px 16px 16px 0;
+  color:var(--ink-3); font-variant-numeric:tabular-nums;
+}
+.tier{
+  background:var(--surface-2); padding:9px 16px; font-family:var(--sans); font-size:11px;
+  font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2);
+  border-bottom:1px solid var(--rule); display:flex; justify-content:space-between; gap:12px;
+}
+.tier em{font-style:normal; color:var(--ink-3); font-weight:500; letter-spacing:.04em; text-transform:none}
+
+/* ---------- boundary diagram ---------- */
+.diagram{margin:26px 0; border:1px solid var(--rule); border-radius:3px; background:var(--surface); padding:22px; overflow-x:auto}
+.diagram svg{display:block; min-width:640px; width:100%; height:auto}
+
+/* ---------- feature cards ---------- */
+.feats{display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:3px; margin:24px 0; overflow:hidden}
+.feat{background:var(--surface); padding:20px; display:flex; flex-direction:column}
+.feat .top{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:9px}
+.feat h5{font-family:var(--sans); font-size:15.5px; font-weight:600; margin:0; letter-spacing:-.008em}
+.feat p{font-size:14.5px; line-height:1.5; margin:0 0 11px; color:var(--ink-2)}
+.feat .meta{
+  font-family:var(--mono); font-size:11px; color:var(--ink-3); display:flex; flex-wrap:wrap;
+  gap:4px 12px; border-top:1px solid var(--rule); padding-top:10px; margin-top:auto;
+}
+.feat .moat{font-family:var(--sans); font-size:13px; color:var(--ink-2); margin:0 0 12px}
+.feat .moat b{font-family:var(--sans); font-weight:600; color:var(--ink); font-size:11px; letter-spacing:.08em; text-transform:uppercase}
+
+/* ---------- demo script ---------- */
+.beat{display:grid; grid-template-columns:52px 1fr; gap:0 16px; padding:15px 0; border-bottom:1px solid var(--rule)}
+.beat:last-child{border-bottom:0}
+.beat .t{font-family:var(--mono); font-size:12px; color:var(--accent); font-variant-numeric:tabular-nums; padding-top:3px}
+.beat .s b{font-family:var(--sans); font-size:14.5px; font-weight:600; display:block; margin-bottom:3px}
+.beat .s span{font-size:14.5px; color:var(--ink-2)}
+.beat .s .say{font-style:italic; color:var(--ink); display:block; margin-top:6px; padding-left:11px; border-left:2px solid var(--accent-line)}
+
+.footer{margin-top:60px; padding-top:22px; border-top:2px solid var(--ink); font-family:var(--mono); font-size:11.5px; color:var(--ink-3); line-height:1.7}
+.footer div{margin-bottom:6px}
+
+@media (max-width:640px){
+  body{font-size:16px}
+  .wrap{padding:0 18px 64px}
+  .statusbar .inner{padding:9px 18px}
+  .rung{grid-template-columns:46px 1fr}
+  .rung .hrs{grid-column:2; text-align:left; padding:0 18px 14px}
+  .strip div{border-right:0; border-bottom:1px solid var(--rule)}
+}
+</style>
+
+<div class="statusbar"><div class="inner">
+  <span><b>dCORTEX AIR</b> · CREW OPS ADVISOR</span>
+  <span>SNAPSHOT <b>2026-09-14 18:00Z</b></span>
+  <span>HUB BLR · 147 LEGS · 150 CREW · 39 PAIRINGS</span>
+  <span><span class="dot"></span>ORACLE PARITY 7/7</span>
+</div></div>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Build plan &amp; investment case · dCortex hackathon</p>
+  <h1>The 06:00 Advisor</h1>
+  <p class="standfirst">The model translates. The kernel decides. Everything defensible sits above both — because
+  <strong>the rule engine is eight hours of work and it is not a moat</strong>, and pretending otherwise is how you lose money on this.</p>
+
+  <div class="strip">
+    <div><span class="n">7/7</span><span class="l">Answer keys reproduced bit-exact from shipped data alone</span></div>
+    <div><span class="n">1.37 ms</span><span class="l">Per full legality check — enumeration is free</span></div>
+    <div><span class="n">4/37</span><span class="l">Graded questions the cover-options oracle actually covers</span></div>
+    <div><span class="n">42.51 h</span><span class="l">Peak 7-day duty load against a 60 h cap — the headroom panel is empty</span></div>
+    <div><span class="n">19:00–02:00Z</span><span class="l">Hours with no reserve captain on call, any rating</span></div>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<section id="finding">
+  <span class="secnum">01 — THE FINDING THAT REFRAMES THE PROJECT</span>
+  <h2>I rebuilt the grader before I wrote the plan</h2>
+  <div class="col">
+    <p class="lede">Before deciding what to build, I reimplemented the dataset's answer-key resolver from the shipped
+    JSON only — no generator code at runtime — and diffed it against every published key.</p>
+
+    <p>Roughly two hundred lines of Python reproduce <em>all six scenario answer keys byte-for-byte</em>: the option
+    arrays, the costs, the ranks, the action strings, and the excluded-candidate reason strings verbatim — including the
+    engineered <code>61.33h</code> breach printed as <code>"would exceed 60h/7d by 1h20m"</code> and
+    <code>C-5837</code>'s <code>"only 10.75h rest before P-2204 … (downstream conflict)"</code>. Five independent
+    research agents reached the same result separately.</p>
+
+    <p>The same code then reproduced both <strong>held-out</strong> scenario shapes with zero new lines — an ATR First
+    Officer sick call resolving to <code>C-3316</code> at <span class="m">₹18,500</span>, and a HYD closure resolving to
+    <code>DX461</code>/<code>DX462</code>.</p>
+  </div>
+
+  <div class="call ok">
+    <div class="h">What this buys, and what it costs</div>
+    <p><b>Buys:</b> Tier-2 and Tier-3 correctness is a <em>solved, bounded engineering problem</em>. There is no
+    modelling risk and no reason to approximate anything. Held-out generalisation is free if the events are
+    parameterised rather than switch-cased.</p>
+    <p><b>Costs:</b> every competent team in the room can do this too. <strong>The kernel is table stakes, not
+    differentiation.</strong> An investment thesis that rests on "we built an accurate rule engine" is an investment in
+    a commodity. Everything in §5 exists because of this sentence.</p>
+  </div>
+
+  <div class="col">
+    <h3>The strategic error to avoid</h3>
+    <p>The tempting framing — <em>"we reproduce the oracle bit-exactly"</em> — is the weakest possible presentation of
+    the strongest possible work. It converts a domain-modelling achievement into a grader-fitting accusation, and it
+    costs you on the two heaviest criteria (AI Utilization 20%, Technical Excellence 15%).</p>
+    <p>Lead instead with the <strong>Rulebook Conformance Report</strong> (§4) and the <strong>reserve-pool blind
+    spot</strong> (§5) — findings about the <em>operation</em>, which happen to prove the kernel is exact.</p>
+    <p><b>On provenance, say it once and move on.</b> The starter pack shipped <code>generate.py</code>; we read it.
+    The kernel we ship derives from <code>data/*.json</code> only and reproduces every key without it. One line in the
+    README. Concealment is the only version of this that is actually wrong.</p>
+  </div>
+</section>
+
+<hr>
+
+<!-- ============================================================ -->
+<section id="architecture">
+  <span class="secnum">02 — ARCHITECTURE</span>
+  <h2>Two lanes, one kernel, and a seam you can see</h2>
+  <div class="col">
+    <p class="lede">The brief's real question is not "can you answer the questions" — it is <em>"how deliberately is the
+    LLM / deterministic boundary drawn?"</em> So make the boundary a visible, running artifact rather than a claim on a
+    slide.</p>
+
+    <p>A single closed-enumeration parser is not enough. Measured against the graded surface, the cover-options oracle
+    answers only <strong>4 of 37</strong> answerable questions; eleven distinct capability families appear, and three
+    questions (<code>Q30</code>, <code>Q36</code>, <code>Q38</code>) have answer keys that are explicitly judgement —
+    <code>Q38</code>'s key literally reads <em>"Open-ended; judged on operational reasoning, not exact match."</em>
+    A closed IR must drop, refuse, or fabricate a slot for those. All three lose points.</p>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 900 340" role="img" aria-label="Architecture diagram: a controller question enters a router that splits into a fast typed-plan lane, a tool-calling fallback lane, and a labelled judgement lane. The first two reach a single deterministic kernel, whose evidence ledger gates the narrating model.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="Archivo, sans-serif" font-size="12.5">
+
+        <rect x="8" y="140" width="132" height="52" rx="3" fill="var(--surface-2)" stroke="var(--rule-strong)"/>
+        <text x="74" y="162" text-anchor="middle" fill="var(--ink)" font-weight="600">Controller asks</text>
+        <text x="74" y="179" text-anchor="middle" fill="var(--ink-3)" font-size="11">plain language</text>
+
+        <rect x="176" y="132" width="112" height="68" rx="3" fill="var(--target-soft)" stroke="var(--target)"/>
+        <text x="232" y="156" text-anchor="middle" fill="var(--target)" font-weight="600">Router</text>
+        <text x="232" y="173" text-anchor="middle" fill="var(--ink-3)" font-size="10.5">confidence</text>
+        <text x="232" y="187" text-anchor="middle" fill="var(--ink-3)" font-size="10.5">gate</text>
+
+        <rect x="330" y="42" width="214" height="76" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="344" y="66" fill="var(--accent)" font-weight="600" font-size="11">LANE A · FAST PATH</text>
+        <text x="344" y="86" fill="var(--ink)" font-size="12.5">Typed plan IR → schema validate</text>
+        <text x="344" y="104" fill="var(--ink-3)" font-size="11">the model emits a plan, never an answer</text>
+
+        <rect x="330" y="132" width="214" height="76" rx="3" fill="var(--surface-2)" stroke="var(--rule-strong)"/>
+        <text x="344" y="156" fill="var(--ink-2)" font-weight="600" font-size="11">LANE B · FALLBACK</text>
+        <text x="344" y="176" fill="var(--ink)" font-size="12.5">Kernel exposed as typed tools</text>
+        <text x="344" y="194" fill="var(--ink-3)" font-size="11">agent loop, unanticipated phrasings</text>
+
+        <rect x="330" y="222" width="214" height="76" rx="3" fill="var(--caution-soft)" stroke="var(--caution)"/>
+        <text x="344" y="246" fill="var(--caution)" font-weight="600" font-size="11">LANE C · JUDGEMENT</text>
+        <text x="344" y="266" fill="var(--ink)" font-size="12.5">Advisory, labelled as such</text>
+        <text x="344" y="284" fill="var(--ink-3)" font-size="11">cites facts, asserts no new number</text>
+
+        <rect x="586" y="88" width="150" height="120" rx="3" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.5"/>
+        <text x="661" y="118" text-anchor="middle" fill="var(--ink)" font-weight="700" font-size="14">KERNEL</text>
+        <text x="661" y="139" text-anchor="middle" fill="var(--ink-3)" font-size="10.5">7 rules · exact</text>
+        <text x="661" y="155" text-anchor="middle" fill="var(--ink-3)" font-size="10.5">arithmetic</text>
+        <text x="661" y="177" text-anchor="middle" fill="var(--accent)" font-family="IBM Plex Mono, monospace" font-size="11">1.37 ms</text>
+        <text x="661" y="193" text-anchor="middle" fill="var(--ink-3)" font-size="10.5">no model inside</text>
+
+        <rect x="586" y="228" width="150" height="70" rx="3" fill="var(--ok-soft)" stroke="var(--ok)"/>
+        <text x="661" y="252" text-anchor="middle" fill="var(--ok)" font-weight="600" font-size="11.5">EVIDENCE LEDGER</text>
+        <text x="661" y="270" text-anchor="middle" fill="var(--ink-3)" font-size="10.5">every number it touched,</text>
+        <text x="661" y="284" text-anchor="middle" fill="var(--ink-3)" font-size="10.5">including intermediates</text>
+
+        <rect x="778" y="128" width="114" height="80" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="835" y="154" text-anchor="middle" fill="var(--accent)" font-weight="600" font-size="11">NARRATOR</text>
+        <text x="835" y="172" text-anchor="middle" fill="var(--ink)" font-size="11.5">writes the</text>
+        <text x="835" y="188" text-anchor="middle" fill="var(--ink)" font-size="11.5">sentence only</text>
+
+        <g stroke="var(--rule-strong)" stroke-width="1.4" fill="none" marker-end="url(#ar)" color="var(--rule-strong)">
+          <path d="M140,166 L172,166"/>
+          <path d="M288,152 L326,88"/>
+          <path d="M288,166 L326,168"/>
+          <path d="M288,182 L326,250"/>
+          <path d="M544,88 L582,130"/>
+          <path d="M544,168 L582,158"/>
+          <path d="M544,252 L582,258"/>
+          <path d="M736,148 L774,158"/>
+        </g>
+        <path d="M661,208 L661,224" stroke="var(--ok)" stroke-width="1.4" fill="none" marker-end="url(#ar)" color="var(--ok)"/>
+        <path d="M736,262 C768,262 778,222 778,202" stroke="var(--ok)" stroke-width="1.4" fill="none" marker-end="url(#ar)" color="var(--ok)"/>
+        <text x="812" y="238" text-anchor="middle" fill="var(--ok)" font-size="10" font-family="IBM Plex Mono, monospace">gate</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="col">
+    <h3>The rule that makes it real</h3>
+    <p>The model is <em>structurally</em> prevented from computing — not instructed not to. Raw duty clocks and
+    certifications never enter the narration context at all; only the evidence ledger does. A model told not to compute
+    will still restate a number it half-remembers from context. Remove the context.</p>
+
+    <h3>The containment guard, corrected</h3>
+    <p>The obvious version of this guard — <em>"every number in the prose must appear in the answer object"</em> — was
+    measured at a <strong>67.8% false-block rate against the oracle's own answer-key prose</strong>. It blocks
+    <code>"only 10.75h rest"</code> (an intermediate, never a field), <code>"exceed 60h/7d by 1h20m (total 61.33h)"</code>
+    (four of five tokens are limits, windows, or a unit conversion the engine itself performs), and it trips on the
+    digits inside <code>ATR72</code> and <code>A320</code>.</p>
+    <p>So: check containment against the <strong>evidence ledger</strong>, which pre-declares every number the narrator
+    may use, including intermediates and unit-converted forms. Normalise identifiers, aircraft types, ISO dates and
+    clock times out first. Apply it to <em>numbers only</em> — never to entities or claims.</p>
+  </div>
+
+  <h4>Latency budget — the brief says 45 seconds is not a decision aid</h4>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Stage</th><th class="mono">Budget</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Intent parse → typed plan</td><td class="num">400–700 ms</td><td>Small fast model; prompt-cached schema and few-shot examples</td></tr>
+        <tr><td>Kernel execution</td><td class="num">1.4–30 ms</td><td>Measured. In-process dictionaries, no database round-trip</td></tr>
+        <tr><td>Ledger assembly + guard</td><td class="num">&lt;5 ms</td><td>Pure Python</td></tr>
+        <tr><td>Narration (streamed)</td><td class="num">600–1200 ms</td><td>Stream the prose; <b>never</b> stream the verdict</td></tr>
+        <tr><td><b>Lane A total</b></td><td class="num"><b>~1.2–2.0 s</b></td><td>Verdict token renders before narration begins</td></tr>
+        <tr><td>Lane B fallback</td><td class="num">3–6 s</td><td>Multi-hop tool loop; show a working indicator</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr>
+
+<!-- ============================================================ -->
+<section id="mvp">
+  <span class="secnum">03 — THE MVP</span>
+  <h2>A nine-rung ladder you can stop climbing at any point</h2>
+  <div class="col">
+    <p class="lede">Ship in this order and every stopping point is a coherent submission. The cut-lines map to the
+    brief's own benchmark table.</p>
+  </div>
+
+  <div class="ladder">
+    <div class="tier"><span>Rungs 1–3 · Minimum viable</span><em>"Tier 1 answered accurately and clearly"</em></div>
+    <div class="rung">
+      <div class="id">R1</div>
+      <div class="body"><b>Loader, indices, Tier-1 primitives, renderer</b>
+        <span>In-memory dictionaries plus secondary indices on (rank, rating, base, date). Eight retrieval accessors. A
+        deterministic answer-card renderer with visible provenance chips. CLI or minimal chat.</span></div>
+      <div class="hrs">4 h</div>
+    </div>
+    <div class="rung">
+      <div class="id">R2</div>
+      <div class="body"><b>The five rule predicates as pure functions</b>
+        <span><code>duty_window_sum</code>, <code>fdp_limit</code>, <code>rest_gap</code>, <code>certs_valid_on</code>,
+        <code>rated_for</code>. Each returns its arithmetic, not just a boolean.</span></div>
+      <div class="hrs">3 h</div>
+    </div>
+    <div class="rung">
+      <div class="id">R3</div>
+      <div class="body"><b>The eval harness — do not defer this</b>
+        <span>Replays all 38 questions and 6 scenarios, printing <span class="m">CORRECT / ABSTAINED / WRONG</span> as
+        three separate columns, with set-based comparators and tie-aware option diffing. Plus refusal gates 1–3.</span></div>
+      <div class="hrs">4 h</div>
+    </div>
+
+    <div class="tier"><span>Rungs 4–6 · Strong</span><em>"Tier 2 end-to-end, with clear explanations"</em></div>
+    <div class="rung">
+      <div class="id">R4</div>
+      <div class="body"><b><code>check_cover()</code> — the keystone</b>
+        <span>Merged sorted timeline, <code>exclude_pairing</code>, <code>delay_h</code>, per-rule evidence. Every trap
+        in §4 lives here. Returns <code>(legal, issues[], ledger)</code>.</span></div>
+      <div class="hrs">5 h</div>
+    </div>
+    <div class="rung">
+      <div class="id">R5</div>
+      <div class="body"><b>Overlay engine and four impact analysers</b>
+        <span>Immutable base snapshot; events are composable overlays applied on read. <span class="m">SICK_CREW ·
+        STATION_CLOSURE · DELAY · CERT_EXPIRY · MULTI_SICK</span>. This is the time-locked bet — see below.</span></div>
+      <div class="hrs">6 h</div>
+    </div>
+    <div class="rung">
+      <div class="id">R6</div>
+      <div class="body"><b>Typed plan lane, tool-calling fallback, answer cards</b>
+        <span>Build the plan IR as a small <em>algebra</em> (selectors, filters, evaluator, set and aggregate ops), not a
+        closed enum of question types. Refusal gates 4–7, split into two structurally distinct classes.</span></div>
+      <div class="hrs">11 h</div>
+    </div>
+
+    <div class="tier"><span>Rungs 7–9 · Exceptional</span><em>"Tier 3 ranked options plus honest handling of its own limits"</em></div>
+    <div class="rung">
+      <div class="id">R7</div>
+      <div class="body"><b><code>cover_options()</code> — full enumeration</b>
+        <span>All active crew of the rank, deadhead handling, the cost model, the <code>(cost_inr, crew_id)</code> sort,
+        cancel appended after the sort, and the exclusion list surfaced as a first-class panel.</span></div>
+      <div class="hrs">5 h</div>
+    </div>
+    <div class="rung">
+      <div class="id">R8</div>
+      <div class="body"><b>Case Board, joint cover, notification fact-lock</b>
+        <span>Cases with state and a commitment ledger — this is what kills the S6 double-book. Pairwise min-cost joint
+        pick. Notifications drafted by the model over a deterministic fact packet, every hard fact string-matched back.</span></div>
+      <div class="hrs">8 h</div>
+    </div>
+    <div class="rung">
+      <div class="id">R9</div>
+      <div class="body"><b>Conformance report, fragility radar, the three commentary sections</b>
+        <span>Rulebook Conformance Report plus <code>--strict</code> mode. Cover-fragility index. Known Limits table
+        wired into the renderer. Scalability, Performance and Business Impact written with one measured number each.</span></div>
+      <div class="hrs">7 h</div>
+    </div>
+  </div>
+
+  <div class="call">
+    <div class="h">Cut order, if time collapses</div>
+    <p>Cut in this sequence: <b>voice</b> (never build it) → multi-turn memory → the closure and delay recovery planners
+    (<code>Q33</code>/<code>Q35</code> — most code for least rubric weight) → joint optimisation → the second ranking axis.</p>
+    <p><b>Never cut:</b> the eval harness, the refusal gates, the architecture diagram, the Known Limits table, and the
+    three commentary sections. Those last three are <span class="m">15%</span> of the total score for about three and a
+    half hours of writing, and most teams will ship without them.</p>
+  </div>
+
+  <div class="col">
+    <h3>Why R5 must happen on day one</h3>
+    <p>The overlay engine is the only <em>time-locked</em> decision here. A team that opens with a scenario switch
+    statement cannot convert to overlays later without rewriting every solver — the advantage is unrecoverable once
+    forfeited. It is also the entire reason both held-out scenarios cost zero new code: they are the same event
+    templates with different arguments.</p>
+  </div>
+</section>
+
+<hr>
+
+<!-- ============================================================ -->
+<section id="traps">
+  <span class="secnum">04 — THE DETERMINISTIC CORE</span>
+  <h2>Sixteen ways to be silently, confidently wrong</h2>
+  <div class="col">
+    <p class="lede">Each of these produces an answer that looks right, passes <code>validate.py</code>, and fails the
+    key. They are the actual engineering content of this project. Build the kernel against this table.</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>#</th><th>Trap</th><th>Correct behaviour</th><th class="mono">Blast radius</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1</td><td><b>Certification validity</b> — the natural <code>valid_from ≤ d ≤ valid_to</code> reading</td><td>Test <code>valid_to</code> <b>only</b>. All 150 crew carry a licence <code>valid_from</code> in 2027–2032.</td><td class="mono">Fatal — zero legal crew fleet-wide</td></tr>
+        <tr><td class="mono">2</td><td><b>Reserve on-call window</b> — <code>rules.json</code> prose says "callout time"</td><td>Test the <b>required report time</b> (after any positioning delay), <b>inclusive</b> at both ends.</td><td class="mono">Fatal — destroys S1 and S2</td></tr>
+        <tr><td class="mono">3</td><td><b><code>duty_hours_7d</code></b> reused as a live figure</td><td>It is a snapshot for the window ending 2026-09-14 only. Re-sum for any other date.</td><td class="mono">Flips C-3305 legal ⇄ illegal</td></tr>
+        <tr><td class="mono">4</td><td><b>2026-09-14 double count</b> looks like a bug</td><td>It is canonical. History <em>and</em> roster both contribute; 11 crew affected. Do not "fix" it.</td><td class="mono">±5.25–11.25 h on 11 crew</td></tr>
+        <tr><td class="mono">5</td><td><b>RULE-FLT-03</b> listed in every option's <code>rules_checked</code></td><td>Never computed by the resolver, and non-binding (peak 79.28 h of 100 h). Print it as <em>"evaluated, non-binding"</em> — not "checked".</td><td class="mono">False claim in a compliance trail</td></tr>
+        <tr><td class="mono">6</td><td><b>RULE-QUAL-05 ordering</b></td><td>It short-circuits — the only early return. Unrated crew get exactly <em>one</em> reason string, with nothing appended.</td><td class="mono">Every exclusion string mismatches</td></tr>
+        <tr><td class="mono">7</td><td><b>Candidate pool</b> assumed to be the reserve list</td><td>All <em>active crew of the required rank</em>. Four of six S2 options are day-off callouts of line crew.</td><td class="mono">Recall collapse on Tier 3</td></tr>
+        <tr><td class="mono">8</td><td><b>Cancel option</b> sorted with the rest</td><td>Appended <em>after</em> the sort. Always last rank.</td><td class="mono">The whole ranking shifts</td></tr>
+        <tr><td class="mono">9</td><td><b>Rolling 168-hour</b> duty window</td><td>Calendar-day UTC windows, inclusive of the duty date. Seven dates, not 168 hours.</td><td class="mono">Q02, Q18, Q24, Q26</td></tr>
+        <tr><td class="mono">10</td><td><b>One delay model</b> for both delay types</td><td>Tech delay: report fixed, release shifts → <b>FDP grows</b>. Deadhead: both shift → <b>FDP invariant</b>.</td><td class="mono">Breaks S4 or S2's C-2210</td></tr>
+        <tr><td class="mono">11</td><td><b>Flat 13 h FDP</b></td><td><code>13.0 − 0.5 × max(0, sectors − 2)</code>, counted <em>per duty day</em>. 3 sectors → 12.5 h; 4 → 12.0 h.</td><td class="mono">0.25–0.75 h of real slack</td></tr>
+        <tr><td class="mono">12</td><td><b>Day-1-only</b> legality on a multi-day pairing</td><td>Legal on <em>every</em> day. C-3305 is the teaching case: fine on 15 Sep, breaches by 8h15m on 16 Sep.</td><td class="mono">Wrong recommendation, flagship scenario</td></tr>
+        <tr><td class="mono">13</td><td><b>Same-day-only</b> rest checking</td><td>Merge own duties with cover duties, sort by report, check every adjacent gap. C-5837 fails on 17 Sep, not on the cover days.</td><td class="mono">Q28 and most held-out exclusions</td></tr>
+        <tr><td class="mono">14</td><td><b>Inclusive</b> closure window end</td><td>Half-open <code>[start, end)</code>, on <code>dep_utc</code> for departures and <code>arr_utc</code> for arrivals, same UTC date.</td><td class="mono">Affected-flight list changes</td></tr>
+        <tr><td class="mono">15</td><td><b>Tie-break</b> by anything operational</td><td>Lexicographic <code>(cost_inr, crew_id)</code>. S5 has 43 options, 36 tied at <span class="m">₹12,500</span>.</td><td class="mono">Ranked-list diff fails</td></tr>
+        <tr><td class="mono">16</td><td><b><code>excluded_candidates</code> order</b> compared as a list</td><td>The order is generator insertion order. Compare as a <b>set</b>.</td><td class="mono">False negatives in your own harness</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Turn the traps into the strongest deliverable you have</h3>
+  <div class="col">
+    <p>These sixteen are not one class — they are two, and conflating them is what reads as grader-fitting.</p>
+    <ul>
+      <li><b>Class A — interpretation choices.</b> The Sep-14 double count, the inclusive report-time boundary, the
+      snapshot semantics of <code>duty_hours_7d</code>. A careful engineer reaches these from the shipped data alone,
+      because the data <em>is</em> the spec and the prose is ambiguous. Defending them is ordinary domain modelling.</li>
+      <li><b>Class B — a genuine defect.</b> <code>RULE-CERT-06</code> ignoring <code>valid_from</code> is semantically
+      <em>wrong</em>. It must be reproduced only because the correct check returns zero legal crew fleet-wide.
+      Reproducing that silently would mean shipping a system that cannot detect a not-yet-valid licence.</li>
+    </ul>
+  </div>
+
+  <div class="call ok">
+    <div class="h">Deliverable — the Rulebook Conformance Report</div>
+    <p>One page listing every point where <code>rules.json</code> prose and the shipped data disagree, which reading the
+    system follows, and why. Every affected answer carries an inline flag. Ship a <code>--strict</code> mode that applies
+    the semantically-correct rules and <em>reports that it yields zero legal crew fleet-wide</em>.</p>
+    <p>That single output converts the worst trap in the dataset into proof you modelled the domain rather than the
+    grader — and it is the one artifact no team that skipped the analysis can produce.</p>
+  </div>
+</section>
+
+<hr>
+
+<!-- ============================================================ -->
+<section id="innovation">
+  <span class="secnum">05 — WHAT ACTUALLY DEFENDS THE INVESTMENT</span>
+  <h2>Nine features that survived four independent judges</h2>
+  <div class="col">
+    <p class="lede">Thirty-six candidates were scored from four lenses — capital, rubric points per hour, build
+    feasibility, and live-demo impact. These survived. The moat grades are honest: most are <em>weak</em>, and saying so
+    is worth more than claiming otherwise.</p>
+  </div>
+
+  <div class="feats">
+    <div class="feat">
+      <div class="top"><h5>Rulebook Conformance Report</h5><span class="pill p-must">Must</span></div>
+      <p>Every disagreement between the shipped rule prose and the shipped data, which reading we follow, and a
+      <code>--strict</code> mode that demonstrates the alternative collapses the fleet.</p>
+      <p class="moat"><b>Moat</b> — Medium. Not the code; the <em>reading</em>. It comes only from having done the
+      analysis, and it is the honest answer to "did you model the domain or the grader?"</p>
+      <div class="meta"><span>4 h</span><span>Innovation · Tech Excellence · Presentation</span></div>
+    </div>
+
+    <div class="feat">
+      <div class="top"><h5>Cover-Fragility Radar</h5><span class="pill p-must">Must</span></div>
+      <p>Precomputed cover-depth for every (pairing, role) in the week. <code>P-2289</code> on 14 Sep has exactly
+      <b>one</b> legal captain (<code>C-2210</code>) and <b>one</b> legal Senior Cabin Crew (<code>C-3555</code>) — a
+      genuine single-point-of-failure alert.</p>
+      <p class="moat"><b>Moat</b> — Insight, not code. Trivially copyable <em>if you know to look</em>. Nobody looks,
+      because the brief frames the deliverable as answering questions.</p>
+      <div class="meta"><span>4 h</span><span>Innovation · Business Impact · UX</span></div>
+    </div>
+
+    <div class="feat">
+      <div class="top"><h5>Reserve Blind-Spot Finding</h5><span class="pill p-must">Must</span></div>
+      <p>No reserve captain of <em>any</em> rating is on call <span class="m">19:00Z–02:00Z</span>; the only ATR-rated
+      reserve captain covers just <span class="m">03:00–15:00Z</span>. A sick call at 20:00Z for an early ATR departure
+      has no reserve answer at all.</p>
+      <p class="moat"><b>Moat</b> — None as code, high as evidence. It is a rostering defect your system found that no
+      per-question answer would ever reveal. Costs nothing to compute.</p>
+      <div class="meta"><span>1 h</span><span>Business Impact · Innovation</span></div>
+    </div>
+
+    <div class="feat">
+      <div class="top"><h5>Evidence Ledger &amp; Proof Objects</h5><span class="pill p-must">Must</span></div>
+      <p>Every number the kernel touched — including intermediates and unit conversions — emitted as named, typed facts.
+      It is what makes the containment guard possible, and it is the explanation surface.</p>
+      <p class="moat"><b>Moat</b> — Weak technically. But explainability is weighted <em>throughout</em> the rubric, and
+      <code>excluded_candidates</code> is a graded top-level key in four of six answer keys.</p>
+      <div class="meta"><span>7 h</span><span>AI Utilization · Explainability · Functionality</span></div>
+    </div>
+
+    <div class="feat">
+      <div class="top"><h5>Case Board &amp; Commitment Ledger</h5><span class="pill p-must">Must</span></div>
+      <p>Cases with state, not one-shot question and answer. A <span class="m">COMMIT</span> is a write. This directly
+      kills the S6 double-book trap, where <code>C-3305</code> is rank-1 for <em>both</em> simultaneous sick calls.</p>
+      <p class="moat"><b>Moat</b> — Structural, not clever. It must be the spine from hour one, and it is the distance
+      between an assistant and a system of action. Every stateless bot in the room fails S6.</p>
+      <div class="meta"><span>10 h</span><span>Functionality · UX · Tech Excellence</span></div>
+    </div>
+
+    <div class="feat">
+      <div class="top"><h5>Two-Class Structural Refusal</h5><span class="pill p-must">Must</span></div>
+      <p><b>Data gap:</b> "Not in this dataset — I have these fields; crew contact details and licence currency are not
+      modelled." <b>Parse failure:</b> "I didn't understand — did you mean X or Y?" plus automatic escalation to Lane B.</p>
+      <p class="moat"><b>Moat</b> — None. But a parse miss wearing the costume of intellectual honesty is exposed by one
+      probe: ask the same answerable question two ways and get an answer once, a refusal once.</p>
+      <div class="meta"><span>6 h</span><span>AI Utilization · the stated scoring principle</span></div>
+    </div>
+
+    <div class="feat">
+      <div class="top"><h5>Live Trust Board</h5><span class="pill p-must">Must</span></div>
+      <p>The eval harness surfaced <em>in the product</em>: <span class="m">CORRECT / ABSTAINED / WRONG</span>, with
+      WRONG as the only red column. Answer cards carry the class score — <em>"duty-limit checks: 14/14 against the
+      reference key."</em></p>
+      <p class="moat"><b>Moat</b> — None. It is table-stakes engineering and the difference between shipping and
+      guessing. It is also the single strongest slide available.</p>
+      <div class="meta"><span>4 h</span><span>Tech Excellence · Presentation · Functionality</span></div>
+    </div>
+
+    <div class="feat">
+      <div class="top"><h5>Equivalence Classes, Not Fake Rankings</h5><span class="pill p-should">Should</span></div>
+      <p>Group tied options into cost bands rather than presenting an arbitrary order as a preference. Show the
+      operational spread <em>inside</em> the band — reachability across equal-cost options ranges 45–90 min — without
+      ever changing the graded sort.</p>
+      <p class="moat"><b>Moat</b> — None; it is a groupby and a design decision. Its value is as an honesty signal:
+      36 options tied at one price is not a ranking.</p>
+      <div class="meta"><span>3 h</span><span>UX · Innovation · answer-key safe</span></div>
+    </div>
+
+    <div class="feat">
+      <div class="top"><h5>Minimal-Repair Counterfactuals</h5><span class="pill p-should">Should</span></div>
+      <p><em>"What is the smallest change that makes this legal?"</em> — <code>C-2087</code> needs
+      <span class="m">1.33 h</span> of prior duty released. Exact, computable, and a question no incumbent answers.</p>
+      <p class="moat"><b>Moat</b> — Weak alone; real in combination. It needs the evidence ledger's exact margins, so it
+      is only cheap for a team that already built §4 properly.</p>
+      <div class="meta"><span>6 h</span><span>Innovation · UX</span></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <h3>The one honest compounding asset — and how to present it</h3>
+    <p>Only one thing on the full list of thirty-six is a genuine compounding moat: the <b>decision record corpus</b>.
+    Every committed decision writes an immutable, replayable record — the question, the snapshot and overlay stack, every
+    candidate enumerated, every exclusion with its arithmetic, the option chosen, the message sent. Because each record
+    replays byte-exact, <em>the regression suite grows with usage</em>, and the audit chain is the artifact a safety and
+    compliance function actually requires.</p>
+    <p><b>Present it honestly.</b> In a hackathon the table is empty. Ship the mechanism, draw the flywheel, and say
+    plainly that it is empty today. Never present fourteen on-stage overrides as a trained preference model — that is
+    the fastest way to lose a technical judge.</p>
+  </div>
+</section>
+
+<hr>
+
+<!-- ============================================================ -->
+<section id="kill">
+  <span class="secnum">06 — THE KILL LIST</span>
+  <h2>What I would refuse to fund</h2>
+  <div class="col">
+    <p class="lede">All four judges independently rejected these. Several are things the brief itself suggests, or that
+    a team will feel obliged to build. Each is a measured negative, not a taste call.</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Killed</th><th>Why — measured</th><th class="mono">Saved</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>"Three crew approach duty limits tomorrow" watchlist</b><br><span style="color:var(--ink-3);font-size:12.5px">The brief lists this as an optional enhancement.</span></td>
+          <td>The panel is <b>empty</b>. Peak 7-day utilisation across all 150 crew × 7 days is <span class="m">42.51 h</span> of a 60 h cap (71%), and exactly <b>one</b> crew-day in 900 cannot absorb an extra duty — the engineered <code>C-2087</code> case. A blank panel on stage is worse than no panel. Build the fragility radar instead.</td>
+          <td class="num">4 h</td>
+        </tr>
+        <tr>
+          <td><b>Boot-time counterfactual precompute</b></td>
+          <td>It optimises <b>0.07%</b> of end-to-end latency — 0.36 s to build the whole single-event space versus 1.37 ms on demand, against a ~2000 ms model round-trip. It cannot represent continuous parameters (closure windows at 30-minute granularity is 63,168 states), so it misses the very scenarios it was built for. And it is the one component that dies at scale: 7,851 s at 10,000 crew.</td>
+          <td class="num">6 h</td>
+        </tr>
+        <tr>
+          <td><b>Dual-path verification with two independent engines</b></td>
+          <td>12–18 h to build a second engine whose disagreements you cannot adjudicate. The evidence-ledger guard delivers most of the assurance for a fraction of the cost.</td>
+          <td class="num">14 h</td>
+        </tr>
+        <tr>
+          <td><b>Learned override / preference model</b></td>
+          <td>A ranker fitted on the handful of overrides a demo produces is not a model — it is noise with a confidence interval. Ship the ledger, not the learner.</td>
+          <td class="num">5 h</td>
+        </tr>
+        <tr>
+          <td><b>Merkle roots, hash chains, Ed25519 signing</b></td>
+          <td>Cryptographic vocabulary in a hackathon audit trail reads as theatre to exactly the judges you are trying to impress. An append-only JSONL with a snapshot content hash gets the full replay guarantee.</td>
+          <td class="num">4 h</td>
+        </tr>
+        <tr>
+          <td><b>Animated interactive blast-radius graph</b></td>
+          <td>The prettiest thing on the list and among the least informative here: one accepted cover action perturbs only 9 of 206 option lists (4%) and changes <b>zero</b> rank-1 answers. The constraint graph is slack; the animation would show almost nothing propagating.</td>
+          <td class="num">12 h</td>
+        </tr>
+        <tr>
+          <td><b>Second-domain rulepack / live nurse-rostering switch</b></td>
+          <td>The expansion claim is worth making in the README. Building and demoing a second domain inside five minutes is not — it trades your strongest minutes for a claim nobody disputed.</td>
+          <td class="num">6 h</td>
+        </tr>
+        <tr>
+          <td><b>Full rule-interpreter DSL as specified</b></td>
+          <td>12 h to buy configurability over six rules that are not going to change during the event. Keep rule <em>parameters</em> in data — they already are, in <code>rules.json</code> — and skip the virtual machine.</td>
+          <td class="num">9 h</td>
+        </tr>
+        <tr>
+          <td><b>Ranking by reachability, seniority or risk score</b></td>
+          <td>Actively dangerous: it breaks parity with the graded <code>(cost_inr, crew_id)</code> sort. Surface these <em>inside</em> a tie band as operational context, never as the sort key.</td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td><b>Voice interface</b></td>
+          <td>Listed as an optional enhancement. It is a latency tax and a live-demo failure mode with no rubric line of its own.</td>
+          <td class="num">8 h</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="col" style="color:var(--ink-2)">Roughly <b>68 engineer-hours</b> reclaimed — more than the entire
+  Strong-to-Exceptional span of the ladder in §3.</p>
+</section>
+
+<hr>
+
+<!-- ============================================================ -->
+<section id="demo">
+  <span class="secnum">07 — THE FIVE MINUTES THAT DECIDE IT</span>
+  <h2>Live demo script</h2>
+  <div class="col">
+    <p class="lede">Built only from features rated Must or Should. It ends on the failure case, because the brief says
+    honest failure analysis scores well and overstating capability scores badly.</p>
+  </div>
+
+  <div style="border:1px solid var(--rule); border-radius:3px; background:var(--surface); padding:6px 22px; margin:24px 0">
+    <div class="beat"><div class="t">0:00</div><div class="s"><b>The desk, not the chatbot</b>
+      <span>Open on the board: today's lines, the fragility radar, one pinned red row — <code>C-5417</code>'s recurrent
+      training expired 17 Sep, rostered 19 Sep.</span>
+      <span class="say">"This is already illegal. Nobody told us — we found it."</span></div></div>
+
+    <div class="beat"><div class="t">0:40</div><div class="s"><b>The flagship disruption</b>
+      <span>Type it three different ways — <em>"C-1042 sick"</em>, <em>"my BLR captain on the DEL overnight is out"</em>,
+      <em>"what breaks if Nair calls in"</em>. All three resolve to the identical typed plan and identical numbers.</span>
+      <span class="say">"The model bought us the frame. It did not touch the facts."</span></div></div>
+
+    <div class="beat"><div class="t">1:30</div><div class="s"><b>Why not?</b>
+      <span>Open the ruled-out panel. <code>C-2087</code> — RULE-DUTY-02, 61.33 h against 60 h, over by 1h20m.
+      <code>C-3305</code> — legal on 15 Sep, breaches on 16 Sep by 8h15m. Click <span class="m">12.75 h</span>; its
+      derivation inlines from the source rows.</span>
+      <span class="say">"Every rejection is arithmetic you can check in two seconds."</span></div></div>
+
+    <div class="beat"><div class="t">2:20</div><div class="s"><b>The one nobody else can answer</b>
+      <span>Ask for the minimum repair. <code>C-2087</code> needs 1.33 h of prior duty released to become legal.</span>
+      <span class="say">"Incumbents tell you no. We tell you what 'yes' would cost."</span></div></div>
+
+    <div class="beat"><div class="t">3:00</div><div class="s"><b>The trap every stateless bot walks into</b>
+      <span>Two captains sick at 00:30Z on 18 Sep. Answer them independently and both get <code>C-3305</code> —
+      an illegal plan. The Case Board refuses it and returns the joint plan at <span class="m">₹42,500</span>.</span>
+      <span class="say">"One question, one answer, is not how a desk works."</span></div></div>
+
+    <div class="beat"><div class="t">3:40</div><div class="s"><b>Held-out, live</b>
+      <span>"HYD is shut 05:00 to 09:00 on the nineteenth — what breaks?" The correct list appears, with a per-flight
+      FDP assessment.</span>
+      <span class="say">"We didn't code that scenario. We coded five event types."</span></div></div>
+
+    <div class="beat"><div class="t">4:10</div><div class="s"><b>The limits, on purpose</b>
+      <span>Run the hostile set: weather at BLR, a date outside the horizon, a sick-probability prediction, an aircraft
+      reroute. Four clean, specific refusals — each naming what would make it answerable.</span>
+      <span class="say">"The prediction one we refuse deliberately — the brief says we're not asked to build that, and
+      risk_signals is a provided input."</span></div></div>
+
+    <div class="beat"><div class="t">4:40</div><div class="s"><b>The board, and the number</b>
+      <span>Run <code>advisor status</code> live. <span class="m">Tier 1: 16/16 · Tier 2: 14/14 · Tier 3: 7/8 correct,
+      1 refused, 0 wrong.</span></span>
+      <span class="say">"We don't claim we answer everything. We claim we have never been confidently wrong — and
+      here is the command that checks it. Run it yourself afterwards."</span></div></div>
+  </div>
+
+  <div class="call caution">
+    <div class="h">The failure case to ship — pick the structural one</div>
+    <p>Our legality horizon equals the data horizon. Rosters cover 2026-09-14→20, so we cannot rest-check a replacement
+    whose next duty falls on 21 Sep. We <em>detect</em> it — the candidate's last simulated duty sits within 12 h of the
+    data boundary — and we say <em>"legal within the visible horizon; unverifiable beyond 20 Sep"</em> rather than
+    asserting legality we cannot prove.</p>
+    <p>That is a limitation with a detector and a defined behaviour. It is not an apology.</p>
+  </div>
+</section>
+
+<hr>
+
+<!-- ============================================================ -->
+<section id="business">
+  <span class="secnum">08 — THE BUSINESS CASE</span>
+  <h2>Fact-checked, with the traps marked</h2>
+  <div class="col">
+    <p class="lede">Every citation below was independently verified against primary sources. None was false — but four
+    are dangerously quotable out of context, and one has to be cut. Use the corrected phrasings.</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Claim</th><th>Verdict</th><th>Use it like this</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>IndiGo, Dec 2025</b><br>Crew-rostering / FDTL meltdown</td>
+          <td><span class="pill p-should">Correct with care</span></td>
+          <td>Roughly 4,500 cancellations over ten days and a record <span class="m">₹22.2 crore</span> DGCA penalty are solid, and the DGCA finding names deficiencies in system software support. <b>Do not</b> pair "84.1%" with "8.5%" — the first is a monthly average, the second a single day. Passenger counts range 0.3 M–1.6 M depending on the window; say "over a million across December" and cite the source.</td>
+        </tr>
+        <tr>
+          <td><b>ConstraintBench</b><br>0.8% feasibility on crew assignment</td>
+          <td><span class="pill p-should">Correct, cite narrowly</span></td>
+          <td>Real and remarkably on-point — crew assignment is the worst of ten operations-research domains. But it measures <em>direct, unaided</em> solving. Say: <em>"frontier models reach 0.8% feasibility when asked to solve crew assignment directly — so we never let the model emit an assignment."</em> Stated bare, a judge answers "obviously, nobody builds it that way" and it boomerangs. Note that it is a young preprint.</td>
+        </tr>
+        <tr>
+          <td><b>tau-bench</b><br>Airline domain</td>
+          <td><span class="pill p-should">Half misattributed</span></td>
+          <td>GPT-4o at 35.2% on tau-airline is exact. <b>pass^8 &lt; 25% is the retail figure</b> — the paper publishes no airline pass^8. Use the project's own airline leaderboard instead: run the same task four times and it succeeds all four only 20% of the time.</td>
+        </tr>
+        <tr>
+          <td><b>LLM-Modulo</b><br>Kambhampati et al., ICML 2024</td>
+          <td><span class="pill p-strong">Verified</span></td>
+          <td>The framework <em>is</em> your architecture with a citation attached: the model proposes and explains, an external sound verifier decides. Do not shorten it to "LLMs can't reason" — it is a position paper arguing against both camps, and it is well enough known that a judge will push back.</td>
+        </tr>
+        <tr>
+          <td><b>Logic-LM</b> · <b>PCAS</b><br>Neurosymbolic gains</td>
+          <td><span class="pill p-strong">Verified</span></td>
+          <td>Logic-LM: +18.4% over chain-of-thought, averaged across five datasets — quote the wording exactly, not as "points". PCAS: policy compiled to a Datalog reference monitor lifts compliance 48% → 93%, and it was measured on a benchmark that <em>includes the airline domain</em>. Pin the arXiv version — the paper was retitled between revisions.</td>
+        </tr>
+        <tr>
+          <td><b>Text-to-SQL degradation</b></td>
+          <td><span class="pill p-should">Fix the framing</span></td>
+          <td>The three-point curve is a better story than the pair: 91.2% on Spider 1.0 → 73.0% on BIRD → 21.3% on Spider 2.0's enterprise workflows. BIRD is the <em>middle</em> rung, not the hard end. Conclusion: <em>"we don't generate queries against our schema — we expose typed, tested tools."</em></td>
+        </tr>
+        <tr>
+          <td><b>FAA DOT/FAA/TC-19/37</b><br>ATC decision-support handbook</td>
+          <td><span class="pill p-strong">Verified in full</span></td>
+          <td>Guidelines 2.1.1–2.1.9 map one-to-one onto this product and are free to cite: separate recommended from ruled-out, expose contributing factors, give one recommendation when reliable and several when not, mark simulation mode with distinct chrome. This is your UX slide's spine.</td>
+        </tr>
+        <tr>
+          <td><b>Explanations &amp; over-reliance</b></td>
+          <td><span class="pill p-should">Re-attribute</span></td>
+          <td>"Explanations can increase over-reliance" is Buçinca's <em>literature review</em>, not their result — their finding is that cognitive forcing functions reduce over-reliance but are disliked. Lead with Vasconcelos instead (5 studies, N=731): explanations help when they make <em>verification cheap</em>. That is a design test for every panel — can a controller check this line faster than recomputing it?</td>
+        </tr>
+        <tr>
+          <td><b>Delta / ARCOS</b></td>
+          <td><span class="pill p-cut">Cut it</span></td>
+          <td>The entire technical account traces to one anonymous forum post amplified by two hobbyist blogs. One source cited twice is not two sources. No airline, union, trade-press or regulatory confirmation exists. Remove it from the deck.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>The white space, stated skeptically</h3>
+    <p>Incumbent crew systems — AIMS, Jeppesen, Sabre, NetLine, iFlight, Crane — are mature on exactly the things a
+    hackathon cannot beat: exact legality engines, column-generation optimisers, and integration into payroll, hotel and
+    departure control. <b>They already do most of Tier 1 and much of Tier 3's arithmetic.</b> An honest pitch says so.</p>
+    <p>What every one of them is, structurally, is <em>alert-driven</em>: a problem monitor emitting a queue of
+    vendor-predefined exception types. None answers an ad-hoc question the vendor did not anticipate, argues its
+    recommendation in a form a controller can challenge, or says "I can't answer that reliably." Every conversational AI
+    an airline or aviation vendor has shipped through 2026 is passenger-facing or document retrieval over manuals.
+    Natural-language reasoning over duty-clock arithmetic is genuinely unoccupied.</p>
+    <p>That is a narrower claim than "we replace crew ops," and it is the one that survives contact with a domain expert.</p>
+  </div>
+</section>
+
+<hr>
+
+<!-- ============================================================ -->
+<section id="scale">
+  <span class="secnum">09 — SCALABILITY, HONESTLY</span>
+  <h2>A measured line beats an unfalsifiable claim</h2>
+  <div class="col">
+    <p class="lede">The rubric says reasoned commentary counts. Do not claim scale-invariance — 150 crew and 147 flights
+    stress nothing. Claim a boundary you measured, and name where it moves.</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Component</th><th class="mono">At 150 crew</th><th class="mono">At 10,000 crew</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Single legality check</td><td class="num">1.37 ms</td><td class="num">~91.5 ms</td><td>Survives. <code>O(crew of rank)</code>; still interactive.</td></tr>
+        <tr><td>Full week precompute</td><td class="num">0.36 s</td><td class="num">7,851 s</td><td><b>Dies.</b> This is why we removed it.</td></tr>
+        <tr><td>Candidate scan</td><td class="num">linear, fine</td><td class="num">bottleneck</td><td>Needs <code>(rank, rating, base, date)</code> indexing.</td></tr>
+        <tr><td>Pairwise joint recovery</td><td class="num">21,115 pairs · 1.2 s</td><td class="num">4.3 × 10<sup>8</sup> pairs</td><td>Enumerate-and-rank is the wrong algorithm class above roughly two concurrent events. Named successor: CP-SAT / ILP assignment.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>The deeper point, and the one worth saying out loud: at 3,000 flights a day, disruptions are concurrent and
+    interacting, so the two-simultaneous-sick-calls case stops being the hard scenario and becomes the <em>normal</em>
+    one. Locating that boundary with a measurement, and naming the solver that replaces enumeration past it, is what
+    Scalability and Technical Excellence actually reward. Prototype nothing further.</p>
+  </div>
+</section>
+
+<hr>
+
+<!-- ============================================================ -->
+<section id="risk">
+  <span class="secnum">10 — THE INVESTOR'S VIEW</span>
+  <h2>What would make me not write the cheque</h2>
+  <div class="col">
+    <p class="lede">Asked as an investor rather than a builder, four things would stop me — and three of them are
+    fixable inside this build.</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Risk</th><th>Severity</th><th>Mitigation in this plan</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>The core is commodity.</b> A competent engineer rebuilds the rule engine in a day.</td>
+          <td><span class="pill p-must">Structural</span></td>
+          <td>Accepted and stated. The plan puts nothing on the kernel: value sits in the conformance analysis, the case model, the evidence ledger and the decision corpus. If the pitch ever rests on "our rule engine is accurate", the thesis has failed.</td>
+        </tr>
+        <tr>
+          <td><b>The compounding assets are empty on day one.</b> Decision corpus, preference model, regression growth — all aspiration.</td>
+          <td><span class="pill p-should">Serious</span></td>
+          <td>Ship the mechanism, draw the flywheel, state plainly that it is empty. Credibility here is worth more than the claim. Never present a handful of demo overrides as a learned model.</td>
+        </tr>
+        <tr>
+          <td><b>Incumbents own the integration surface.</b> Payroll, hotel, departure control, and the regulatory relationship.</td>
+          <td><span class="pill p-should">Serious</span></td>
+          <td>Do not pitch replacement. Pitch the layer above the alert queue — the ad-hoc question the vendor did not anticipate. That is a co-existence wedge, and it is the only one an airline would actually pilot.</td>
+        </tr>
+        <tr>
+          <td><b>Demo-day risk.</b> The typed-plan lane is the only component that can fail live.</td>
+          <td><span class="pill p-if">Manageable</span></td>
+          <td>Lane B fallback catches parse misses; the refusal card catches everything else. Rehearse the hostile set. Every number on screen came from a 1.37 ms deterministic call, so nothing can hang on a model.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="call">
+    <div class="h">The one-sentence thesis</div>
+    <p>Fund the team that can tell you, without being asked, that the duty-limit panel would have been empty, that the
+    reserve pool has a five-hour blind spot at night, and that one pairing in the week has exactly one legal captain —
+    because that is a team modelling the operation, and the rule engine is the easy part.</p>
+  </div>
+</section>
+
+<div class="footer">
+  <div>THE 06:00 ADVISOR · BUILD PLAN &amp; INVESTMENT CASE · dCORTEX CREW OPS ADVISOR</div>
+  <div>All figures measured against the shipped synthetic dataset (seed 42, snapshot 2026-09-14T18:00:00Z). Oracle parity verified 7/7, including verbatim exclusion strings and both held-out scenario shapes.</div>
+  <div>Citations independently fact-checked against primary sources; corrected phrasings are given in §8. No claim in this document is presented more strongly than its source supports.</div>
+</div>
+
+</div>

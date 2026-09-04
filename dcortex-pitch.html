@@ -1,0 +1,557 @@
+<title>Who Flies DX412?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --ground:#eef1f4; --slide:#ffffff; --slide-2:#e6ecf0;
+  --ink:#101720; --ink-2:#485765; --ink-3:#7a8896;
+  --rule:#d0d9e0; --rule-strong:#b0bcc6;
+  --accent:#0d5f7b; --accent-soft:#deedf3; --accent-line:#8ec0d1;
+  --ok:#286a45; --ok-soft:#e0f0e7;
+  --caution:#8b5a08; --caution-soft:#f8ecd8;
+  --warn:#9c281c; --warn-soft:#f9e4e1;
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --body:'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif;
+  --mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#080c11; --slide:#131a22; --slide-2:#1a232c;
+    --ink:#e9eff4; --ink-2:#9aa9b7; --ink-3:#778593;
+    --rule:#27333e; --rule-strong:#394855;
+    --accent:#52bcdf; --accent-soft:#0f2f3b; --accent-line:#2a6a80;
+    --ok:#64bf8c; --ok-soft:#112a1e;
+    --caution:#dea748; --caution-soft:#2d2411;
+    --warn:#ea7e6f; --warn-soft:#301712;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#080c11; --slide:#131a22; --slide-2:#1a232c;
+  --ink:#e9eff4; --ink-2:#9aa9b7; --ink-3:#778593;
+  --rule:#27333e; --rule-strong:#394855;
+  --accent:#52bcdf; --accent-soft:#0f2f3b; --accent-line:#2a6a80;
+  --ok:#64bf8c; --ok-soft:#112a1e;
+  --caution:#dea748; --caution-soft:#2d2411;
+  --warn:#ea7e6f; --warn-soft:#301712;
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:var(--body); font-size:17px; line-height:1.6; margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+.deck{max-width:1020px; margin:0 auto; padding:26px 22px 80px; display:flex; flex-direction:column; gap:22px}
+
+.slide{
+  background:var(--slide); border:1px solid var(--rule); border-radius:4px;
+  overflow:hidden; display:flex; flex-direction:column;
+}
+.slide > .head{
+  display:flex; align-items:center; gap:14px; padding:12px 26px;
+  border-bottom:1px solid var(--rule); background:var(--slide-2);
+  font-family:var(--mono); font-size:11px; letter-spacing:.09em; color:var(--ink-3);
+  text-transform:uppercase;
+}
+.slide > .head .no{color:var(--accent); font-weight:600}
+.slide > .head .of{margin-left:auto; font-size:10.5px; opacity:.7}
+.slide > .inner{padding:42px 46px 46px}
+
+h1{
+  font-family:var(--display); font-weight:800; font-size:clamp(40px,7vw,74px);
+  line-height:.98; letter-spacing:-.03em; margin:0 0 22px; text-wrap:balance;
+}
+h2{
+  font-family:var(--display); font-weight:700; font-size:clamp(27px,4.2vw,42px);
+  line-height:1.08; letter-spacing:-.022em; margin:0 0 18px; text-wrap:balance; max-width:22ch;
+}
+h2.wide{max-width:30ch}
+h3{
+  font-family:var(--display); font-weight:600; font-size:19px; letter-spacing:-.008em;
+  margin:30px 0 10px;
+}
+p{margin:0 0 16px; max-width:62ch}
+.big{font-size:21px; line-height:1.5; color:var(--ink-2); max-width:56ch}
+.big strong{color:var(--ink); font-weight:600}
+.sub{color:var(--ink-2)}
+code,.m{font-family:var(--mono); font-size:.88em; font-variant-numeric:tabular-nums}
+code{background:var(--slide-2); padding:1px 5px; border-radius:2px; color:var(--ink)}
+ul{margin:0 0 16px; padding-left:0; list-style:none; max-width:62ch}
+ul li{position:relative; padding-left:26px; margin-bottom:11px}
+ul li::before{content:''; position:absolute; left:4px; top:11px; width:9px; height:2px; background:var(--accent-line)}
+b{font-weight:600}
+
+.say{
+  font-family:var(--display); font-size:19px; font-weight:500; line-height:1.42;
+  color:var(--ink); border-left:3px solid var(--accent); padding:2px 0 2px 18px;
+  margin:26px 0 0; max-width:56ch;
+}
+.say .tag{
+  display:block; font-family:var(--mono); font-size:10px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:7px;
+}
+
+.title-slide .inner{padding:64px 46px 56px}
+.kicker{
+  font-family:var(--mono); font-size:12px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--accent); margin:0 0 24px; font-weight:500;
+}
+.title-meta{
+  display:flex; flex-wrap:wrap; gap:10px 30px; margin-top:34px; padding-top:24px;
+  border-top:1px solid var(--rule); font-family:var(--mono); font-size:12px; color:var(--ink-3);
+}
+
+.nums{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:3px; margin:26px 0 0; overflow:hidden}
+.nums div{background:var(--slide); padding:18px}
+.nums .n{
+  font-family:var(--mono); font-weight:600; font-size:27px; color:var(--accent);
+  display:block; line-height:1.05; letter-spacing:-.02em; font-variant-numeric:tabular-nums;
+}
+.nums .l{display:block; margin-top:9px; font-size:13.5px; color:var(--ink-2); line-height:1.4}
+
+.two{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:3px; margin:24px 0 0; overflow:hidden}
+.two > div{background:var(--slide); padding:22px 24px}
+.two h4,.stack h4{
+  font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+  margin:0 0 12px; font-weight:600;
+}
+.two .bad h4{color:var(--warn)} .two .good h4{color:var(--ok)} .two .neutral h4{color:var(--accent)}
+.two p{font-size:15.5px; margin-bottom:11px}
+.two p:last-child{margin-bottom:0}
+
+.mock{border:1px solid var(--rule-strong); border-radius:4px; background:var(--slide); margin:26px 0 0; overflow:hidden; max-width:640px}
+.mock .bar{
+  padding:8px 16px; background:var(--slide-2); border-bottom:1px solid var(--rule);
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; color:var(--ink-3);
+  display:flex; gap:14px; flex-wrap:wrap; text-transform:uppercase;
+}
+.mock .bod{padding:20px 22px; border-left:4px solid var(--warn)}
+.verdict{
+  font-family:var(--display); font-weight:800; font-size:30px; letter-spacing:-.02em;
+  line-height:1; margin:0 0 14px; color:var(--warn);
+}
+.binding{
+  font-family:var(--mono); font-size:13px; background:var(--slide-2); border:1px solid var(--rule);
+  border-radius:3px; padding:11px 14px; margin:0 0 15px; color:var(--ink);
+  display:flex; flex-wrap:wrap; gap:5px 16px; font-variant-numeric:tabular-nums;
+}
+.binding span{white-space:nowrap}
+.binding .lbl{color:var(--ink-3)}
+.gauge{height:9px; background:var(--slide-2); border:1px solid var(--rule); border-radius:2px; position:relative; margin:0 0 16px; overflow:hidden}
+.gauge .fill{position:absolute; left:0; top:0; bottom:0; background:var(--accent); opacity:.55}
+.gauge .over{position:absolute; top:0; bottom:0; background:var(--warn); opacity:.7}
+.gauge .tick{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--ink)}
+.mock .why{font-size:14.5px; color:var(--ink-2); margin:0}
+.mock .foot{border-top:1px solid var(--rule); padding:12px 22px; background:var(--slide-2); font-family:var(--mono); font-size:11px; color:var(--ink-3)}
+
+.rows{border:1px solid var(--rule); border-radius:3px; overflow:hidden; margin:24px 0 0; background:var(--slide); max-width:720px}
+.row{display:grid; grid-template-columns:96px 1fr; gap:0 16px; padding:14px 18px; border-bottom:1px solid var(--rule); align-items:baseline}
+.row:last-child{border-bottom:0}
+.row .who{font-family:var(--mono); font-size:14px; font-weight:600; color:var(--ink)}
+.row .why{font-size:14.5px; color:var(--ink-2)}
+.row .why b{color:var(--ink); font-family:var(--mono); font-size:13px; font-weight:500}
+.row .why.pick{color:var(--ok)}
+.row .aside{grid-column:1/-1; color:var(--ink-3); font-size:13.5px; font-style:italic}
+
+.stack{display:flex; flex-direction:column; gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:3px; margin:24px 0 0; overflow:hidden}
+.stack > div{background:var(--slide); padding:20px 24px}
+.stack p{margin:0; font-size:15.5px; color:var(--ink-2); max-width:70ch}
+.stack p + p{margin-top:9px}
+.stack .find{font-family:var(--display); font-size:17px; font-weight:600; color:var(--ink); margin:0 0 7px; max-width:none}
+
+.note{border-left:3px solid var(--caution); background:var(--caution-soft); padding:17px 21px; border-radius:0 3px 3px 0; margin:26px 0 0; max-width:62ch}
+.note.ok{border-left-color:var(--ok); background:var(--ok-soft)}
+.note p{margin:0; font-size:15.5px}
+.note p + p{margin-top:10px}
+.note .h{font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; font-weight:600; color:var(--caution); margin-bottom:8px}
+.note.ok .h{color:var(--ok)}
+
+.board{
+  font-family:var(--mono); font-size:14px; background:var(--slide-2); border:1px solid var(--rule);
+  border-radius:3px; padding:20px 24px; margin:24px 0 0; max-width:520px; line-height:2;
+  font-variant-numeric:tabular-nums;
+}
+.board .k{color:var(--ink-3); display:inline-block; min-width:112px}
+.board .v{color:var(--ink); font-weight:500}
+.board .zero{color:var(--ok); font-weight:600}
+.board .hr{border-top:1px solid var(--rule); margin:10px 0; height:0}
+
+.closer{background:var(--accent-soft); border-color:var(--accent-line)}
+.closer > .head{background:transparent; border-bottom-color:var(--accent-line)}
+
+@media (max-width:720px){
+  body{font-size:16.5px}
+  .deck{padding:16px 14px 56px; gap:16px}
+  .slide > .inner{padding:30px 24px 34px}
+  .title-slide .inner{padding:42px 24px 38px}
+  .slide > .head{padding:11px 18px}
+  .two{grid-template-columns:1fr}
+  .row{grid-template-columns:1fr; gap:5px}
+}
+</style>
+
+<div class="deck">
+
+<!-- 01 ---------------------------------------------------------- -->
+<section class="slide title-slide">
+  <div class="head"><span class="no">01</span><span>Title</span><span class="of">dCortex · Crew Ops Advisor</span></div>
+  <div class="inner">
+    <p class="kicker">A crew controller's question, answered in under two seconds</p>
+    <h1>Who flies DX412?</h1>
+    <p class="big">It's 5 a.m. A captain just called in sick. Six flights and 486 passengers are now without
+    a crew, and someone has to work out — right now — <strong>who is allowed to fly them.</strong></p>
+    <div class="title-meta">
+      <span>dCORTEX AIR · HUB BLR</span>
+      <span>147 FLIGHTS · 150 CREW · 7 DAYS</span>
+      <span>ALL TIMES UTC</span>
+    </div>
+  </div>
+</section>
+
+<!-- 02 ---------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">02</span><span>The problem</span><span class="of">02 / 14</span></div>
+  <div class="inner">
+    <h2>Every airline runs on a plan. The plan never survives the day.</h2>
+    <p class="big">Crew are assigned to flights weeks ahead. Then someone gets sick. A storm shuts an
+    airport. One late aircraft breaks the four flights behind it.</p>
+    <p>A small team called <b>Crew Control</b> absorbs all of it. Their job is not noticing that something
+    broke — that part is obvious. Their job is working out <b>what breaks next</b>, and who can legally be
+    moved to cover it.</p>
+    <p>Today they do that by reading five or six different screens and making phone calls, under time
+    pressure, largely from memory.</p>
+    <div class="say"><span class="tag">Say this</span>
+      "The hard part isn't the alarm. It's the answer."</div>
+  </div>
+</section>
+
+<!-- 03 ---------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">03</span><span>Why it's hard</span><span class="of">03 / 14</span></div>
+  <div class="inner">
+    <h2 class="wide">One question. Eight files. And the answer is maths, not opinion.</h2>
+    <p class="big">To say whether one person can fly one trip, you have to combine:</p>
+    <ul>
+      <li>Their roster — what they are already scheduled to do</li>
+      <li>Their duty clock — how many hours they have already worked this week</li>
+      <li>Their licences and medical certificates, and when each one expires</li>
+      <li>Which aircraft types they are trained on</li>
+      <li>Where they are based, and how long it takes to reach them</li>
+      <li>The standby list — who is on call, and during which hours</li>
+      <li>And a rulebook of hard legal limits</li>
+    </ul>
+    <div class="note">
+      <div class="h">And here is the part that makes this different</div>
+      <p>A pilot may work <b>60 hours in any 7 days</b>. Covering this particular trip would put Captain
+      C-2087 on <b>61 hours and 20 minutes</b>.</p>
+      <p>That is about 2% over. In aviation, 2% over is not "close enough" — it is <b>illegal</b>. An answer
+      that is nearly right is not a slightly worse answer. It is a violation.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 04 ---------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">04</span><span>The obvious idea</span><span class="of">04 / 14</span></div>
+  <div class="inner">
+    <h2>"Just give the AI the data and let it answer."</h2>
+    <p class="big">This is what most people try first. It works fine for simple lookups. It falls apart on
+    exactly the questions that matter.</p>
+
+    <div class="two">
+      <div class="bad">
+        <h4>Where it breaks</h4>
+        <p>Language models are excellent at understanding what you meant. They are unreliable at long chains
+        of exact arithmetic — adding up seven days of hours, comparing against a limit, then checking rest
+        gaps, then licence dates, for every candidate.</p>
+        <p>And they don't fail loudly. They produce a confident, well-written, <b>wrong</b> answer.</p>
+      </div>
+      <div class="good">
+        <h4>The evidence</h4>
+        <p>Researchers tested today's best models on ten kinds of scheduling problem. On <b>crew
+        assignment</b> — this exact problem — the models produced a workable answer <b>0.8% of the time</b>.</p>
+        <p>It was the worst score of all ten. Crew assignment is the single hardest thing on that list to
+        hand to a model and walk away from.</p>
+      </div>
+    </div>
+
+    <div class="say"><span class="tag">Say this</span>
+      "A confident wrong answer at 5 a.m. is worse than no answer at all — because someone acts on it."</div>
+  </div>
+</section>
+
+<!-- 05 ---------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">05</span><span>Our answer</span><span class="of">05 / 14</span></div>
+  <div class="inner">
+    <h2>The AI does the talking. A calculator does the deciding.</h2>
+    <p class="big">We split the job in two, on purpose, and we never let the two halves swap roles.</p>
+
+    <div class="two">
+      <div class="neutral">
+        <h4>The AI's job</h4>
+        <p>Understand the question, however it is phrased. "C-1042 is sick." "My Bangalore captain on the
+        Delhi overnight is out." "What breaks if Nair calls in?"</p>
+        <p>All three mean the same thing. The AI turns each of them into the same precise request.</p>
+        <p>Then, at the very end, it writes the answer back in plain English.</p>
+      </div>
+      <div class="neutral">
+        <h4>The calculator's job</h4>
+        <p>Everything with a number in it. Duty hours, rest gaps, licence dates, costs — and every
+        legal-or-illegal decision.</p>
+        <p>This is ordinary, testable code. It runs in <b>1.4 milliseconds</b>, which is fast enough to check
+        every single person on the payroll every time, instead of guessing at a shortlist.</p>
+      </div>
+    </div>
+
+    <div class="note ok">
+      <div class="h">The rule we enforce in the plumbing, not in the prompt</div>
+      <p>The AI is never <em>shown</em> the raw duty clocks. It only ever sees the finished numbers the
+      calculator produced. It cannot get the arithmetic wrong, because it never sees the arithmetic.</p>
+      <p>And before any answer reaches you, we check every number in the sentence against the numbers the
+      calculator actually produced. If one doesn't match, the answer is blocked.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 06 ---------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">06</span><span>What you see</span><span class="of">06 / 14</span></div>
+  <div class="inner">
+    <h2>An answer you can check in ten seconds</h2>
+    <p class="big">Not a paragraph. A verdict, the one rule that decided it, and the arithmetic behind it.</p>
+
+    <div class="mock">
+      <div class="bar"><span>Can C-2087 cover P-2291?</span><span>Computed</span><span>380 ms</span><span>7 rules · 27 candidates</span></div>
+      <div class="bod">
+        <p class="verdict">NOT LEGAL</p>
+        <div class="binding">
+          <span><span class="lbl">Rule</span> RULE-DUTY-02</span>
+          <span><span class="lbl">Would work</span> 61.33 h</span>
+          <span><span class="lbl">Limit</span> 60.00 h</span>
+          <span><span class="lbl">Over by</span> 1h20m</span>
+          <span><span class="lbl">Week ending</span> 15 Sep</span>
+        </div>
+        <div class="gauge">
+          <div class="fill" style="width:82%"></div>
+          <div class="over" style="left:82%; width:18%"></div>
+          <div class="tick" style="left:82%"></div>
+        </div>
+        <p class="why">He has already worked 51.83 hours this week. This trip adds 9.5 more. The limit is
+        60 hours in any 7 days.</p>
+      </div>
+      <div class="foot">SOURCES · duty_clocks.json → C-2087 → 09–15 Sep · rosters.json → P-2291 → day 1</div>
+    </div>
+
+    <p style="margin-top:24px" class="sub">The black line is the legal limit. The red is how far past it this
+    assignment would go. Every figure on the card is clickable — click <code>61.33 h</code> and it shows you
+    the day-by-day sum it came from.</p>
+  </div>
+</section>
+
+<!-- 07 ---------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">07</span><span>The differentiator</span><span class="of">07 / 14</span></div>
+  <div class="inner">
+    <h2>We show you who we ruled out, and exactly why</h2>
+    <p class="big">Most tools give you a recommendation. A controller's first question is always the same:
+    <strong>"why not someone else?"</strong></p>
+
+    <div class="rows">
+      <div class="row"><div class="who">C-2087</div><div class="why">Would go over the 60-hour weekly limit. <b>61.33 h — over by 1h20m</b></div></div>
+      <div class="row"><div class="who">C-3305</div><div class="why">Fine for day one. Breaks the same limit on <b>day two, by 8h15m</b></div></div>
+      <div class="row"><div class="aside">— this is the one a human misses. It looks perfectly legal until you check the second day.</div></div>
+      <div class="row"><div class="who">C-2091</div><div class="why">Not trained on this aircraft type. <b>No A320 rating</b></div></div>
+      <div class="row"><div class="who">C-5837</div><div class="why">Would only get <b>10.75 h rest</b> before his own trip two days later. Minimum is 12 h</div></div>
+      <div class="row"><div class="who">C-3310</div><div class="why pick"><b>Legal. On standby, based here, reachable in 45 minutes. ₹18,500 — recommended</b></div></div>
+    </div>
+
+    <div class="say"><span class="tag">Say this</span>
+      "Every rejection is arithmetic you can check yourself in about two seconds. That is the difference
+      between a tool you trust and a tool you argue with."</div>
+  </div>
+</section>
+
+<!-- 08 ---------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">08</span><span>Saying no</span><span class="of">08 / 14</span></div>
+  <div class="inner">
+    <h2>When we don't know, we say so — and we say what's missing</h2>
+    <p class="big">A system that answers everything is a system that makes things up. We would rather answer
+    ten questions correctly and refuse the eleventh.</p>
+
+    <div class="two">
+      <div class="neutral">
+        <h4>Not in the data</h4>
+        <p><em>"Who do I actually phone?"</em></p>
+        <p>We say: <b>"I don't hold crew contact details."</b> Then we list what we <em>do</em> hold, so you
+        know where to go instead. We never invent a phone number.</p>
+      </div>
+      <div class="neutral">
+        <h4>Not a question we should answer</h4>
+        <p><em>"What's the chance C-2087 calls in sick tomorrow?"</em></p>
+        <p>We say: <b>"That's a prediction, and we don't make predictions."</b> We show the risk score that
+        was handed to us, and we are clear it came from somewhere else.</p>
+      </div>
+    </div>
+
+    <p style="margin-top:24px">Crucially, those are two <b>different</b> messages. "I don't have that data"
+    and "I didn't understand you" are separate problems, and we never disguise one as the other. A tool that
+    hides confusion behind polite humility gets caught the first time you rephrase the question.</p>
+  </div>
+</section>
+
+<!-- 09 ---------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">09</span><span>Proof</span><span class="of">09 / 14</span></div>
+  <div class="inner">
+    <h2>We mark our own homework, and we show you the score</h2>
+    <p class="big">The dataset ships with 38 questions and 6 worked scenarios that have <strong>known correct
+    answers</strong>. We run every one of them against the live system, on every change.</p>
+
+    <div class="board">
+      <div><span class="k">$ advisor status</span></div>
+      <div class="hr"></div>
+      <div><span class="k">Tier 1</span> <span class="v">16 / 16 correct</span></div>
+      <div><span class="k">Tier 2</span> <span class="v">14 / 14 correct</span></div>
+      <div><span class="k">Tier 3</span> <span class="v">7 correct · 1 refused</span></div>
+      <div class="hr"></div>
+      <div><span class="k">WRONG</span> <span class="zero">0</span></div>
+    </div>
+
+    <p style="margin-top:24px">Notice there are <b>three</b> columns, not two. "Refused" is not a failure —
+    it is the system declining to guess. The only number we treat as red is <b>wrong</b>.</p>
+
+    <div class="say"><span class="tag">Say this</span>
+      "We don't claim we can answer everything. We claim we have never been confidently wrong — and here is
+      the command that checks it. Run it yourself after the demo."</div>
+  </div>
+</section>
+
+<!-- 10 --------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">10</span><span>What we found</span><span class="of">10 / 14</span></div>
+  <div class="inner">
+    <h2>Three things in this data nobody asked us to look for</h2>
+    <p class="big">Answering questions is the brief. Finding the problems <strong>before anyone asks</strong>
+    is what makes it worth paying for.</p>
+
+    <div class="stack">
+      <div>
+        <p class="find">1 · There is a trip with exactly one legal captain</p>
+        <p>Pairing <code>P-2289</code> on 14 September. Out of 28 captains on the roster, exactly <b>one</b>
+        could legally take it if the rostered captain called in sick — and exactly one senior cabin crew
+        member. That is a single point of failure sitting quietly inside a published roster.</p>
+      </div>
+      <div>
+        <p class="find">2 · The standby roster has a hole at night</p>
+        <p>Between <b>19:00 and 02:00</b> there is no reserve captain on call. None. And the only reserve
+        captain qualified on the turboprop fleet is on call just 03:00–15:00. A sick call at 8 p.m. for an
+        early-morning turboprop departure has no standby answer at all.</p>
+      </div>
+      <div>
+        <p class="find">3 · One crew member is already rostered illegally</p>
+        <p>A cabin crew member's recurrent training expires on 17 September. They are scheduled to fly on
+        19 September. Our system finds it on startup — before anyone asks a question.</p>
+      </div>
+    </div>
+
+    <div class="say"><span class="tag">Say this</span>
+      "We didn't build a search box. We built something that reads the whole week and tells you where you're
+      thin."</div>
+  </div>
+</section>
+
+<!-- 11 --------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">11</span><span>Honest limits</span><span class="of">11 / 14</span></div>
+  <div class="inner">
+    <h2>Where it breaks — and how it behaves when it does</h2>
+    <p class="big">Every system has an edge. Ours knows where its edge is, and tells you when you have
+    reached it.</p>
+
+    <ul>
+      <li><b>We can only see one week.</b> The roster data stops on 20 September. If we are checking someone
+      whose next trip might fall on the 21st, we cannot verify their rest. So we say <em>"legal within the
+      week we can see; not verifiable beyond 20 September"</em> — rather than claiming a certainty we don't have.</li>
+      <li><b>Two problems at once, we handle. Three or more, we don't claim to.</b> We check every pair of
+      simultaneous disruptions and find the cheapest legal combination. Beyond two, we still return a legal
+      plan — we just stop calling it the best one.</li>
+      <li><b>We only model crew.</b> We don't swap aircraft, rebook passengers, or check whether a hotel room
+      is available. Those are real parts of the job that we deliberately left out.</li>
+      <li><b>"Passengers" here means seats.</b> The data has aircraft capacity, not actual bookings. When we
+      say 486 passengers, we mean 486 seats — and we say so, rather than implying we know who is booked.</li>
+    </ul>
+
+    <div class="note">
+      <div class="h">One more, and it is the interesting one</div>
+      <p>We found several places where the written rulebook and the actual data disagree with each other. We
+      follow the data — but we publish a one-page report listing every disagreement, which reading we chose,
+      and why. It ships with the code.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 12 --------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">12</span><span>Why it matters</span><span class="of">12 / 14</span></div>
+  <div class="inner">
+    <h2>This is not a hypothetical problem</h2>
+
+    <div class="nums">
+      <div><span class="n">~4,500</span><span class="l">Flights IndiGo cancelled over ten days in December 2025, after a crew-rostering failure</span></div>
+      <div><span class="n">₹22.2 cr</span><span class="l">The record penalty India's regulator issued over it</span></div>
+      <div><span class="n">₹2.5 L</span><span class="l">What one cancelled flight costs in this dataset — per leg</span></div>
+      <div><span class="n">₹18,500</span><span class="l">What it costs to call out a standby captain instead</span></div>
+    </div>
+
+    <p style="margin-top:26px">The regulator's own finding into that December pointed at <b>deficiencies in
+    system software support</b>. This is a problem airlines are already being fined for.</p>
+
+    <h3>What we are honestly claiming</h3>
+    <p>The big crew systems — AIMS, Jeppesen, Sabre — are excellent at the maths and deeply wired into
+    payroll and scheduling. We are not replacing them, and we would be foolish to say we could.</p>
+    <p>But every one of them works the same way: a list of alerts the vendor decided in advance to raise.
+    None of them will answer a question the vendor didn't anticipate. None will argue its case in a form you
+    can push back on. And none will ever say <em>"I'm not sure."</em></p>
+    <p><b>That gap is where we sit.</b></p>
+  </div>
+</section>
+
+<!-- 13 --------------------------------------------------------- -->
+<section class="slide">
+  <div class="head"><span class="no">13</span><span>The demo</span><span class="of">13 / 14</span></div>
+  <div class="inner">
+    <h2>Five minutes, live</h2>
+    <div class="stack">
+      <div><p class="find">0:00 — We open on an illegal roster we found ourselves</p><p>Not a chat box. A board, with one red row already on it.</p></div>
+      <div><p class="find">0:40 — The same question, asked three different ways</p><p>All three produce the identical answer. The AI understood the question; it never touched the facts.</p></div>
+      <div><p class="find">1:30 — "Why not?"</p><p>Every rejected crew member, with the exact rule and the exact margin.</p></div>
+      <div><p class="find">2:20 — "What would make it legal?"</p><p>C-2087 needs 1.33 hours of earlier duty released. Nobody else answers this question.</p></div>
+      <div><p class="find">3:00 — Two captains sick at once</p><p>Answer them separately and you assign the same person twice. We catch it and return one legal plan.</p></div>
+      <div><p class="find">3:40 — A scenario we have never seen</p><p>The judges pick it. It works, because we modelled event types rather than scenarios.</p></div>
+      <div><p class="find">4:10 — Four questions we refuse, on purpose</p><p>Each refusal names exactly what would make it answerable.</p></div>
+      <div><p class="find">4:40 — The scoreboard, run live</p><p>Zero wrong.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 14 --------------------------------------------------------- -->
+<section class="slide closer">
+  <div class="head"><span class="no">14</span><span>Close</span><span class="of">14 / 14</span></div>
+  <div class="inner">
+    <h2 class="wide">Fast, because it's code. Right, because it's checked. Trusted, because it says when it isn't sure.</h2>
+    <p class="big">The brief asked for the advisor a real crew controller would want beside them at 6 a.m. on
+    a bad day.</p>
+    <p class="big">At 6 a.m. on a bad day you don't want something clever. You want something that gives you
+    the answer, shows you the sum, tells you who else you could have called — and admits it when the question
+    is one it can't answer.</p>
+    <div class="say"><span class="tag">Last line</span>
+      "We didn't teach an AI to do arithmetic. We taught it when to stop talking and let the calculator
+      answer."</div>
+  </div>
+</section>
+
+</div>

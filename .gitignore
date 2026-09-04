@@ -1,0 +1,16 @@
+# secrets -- never commit
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+eval-report.json
+extracted/
+*.zip
+
+# stray artefacts, not part of this project
+bash.exe.stackdump
+ruvector.db
+.claude/
