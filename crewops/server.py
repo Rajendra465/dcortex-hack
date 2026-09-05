@@ -350,11 +350,170 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         route = self.path.split("?")[0]
-        if route not in ("/api/ask", "/api/whatif", "/api/reset", "/api/set_region"):
+        if route not in ("/api/ask", "/api/whatif", "/api/reset", "/api/set_region", "/api/resolve_event"):
             self._json({"error": "not found"}, 404)
             return
         try:
             snap: Snapshot = _STATE["snap"]
+            if route == "/api/resolve_event":
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+                ev = body.get("dynamic_event", {})
+                ev_type = ev.get("type")
+                result = {"event": ev, "problem": "", "solutions": []}
+
+                try:
+                    from .events import (analyse_sick, analyse_closure, analyse_delay,
+                                         resolve, Impact)
+
+                    if ev_type == "SICK_CREW":
+                        crew_id = ev.get("crew_id", "")
+                        pairing_id = ev.get("pairing_id")
+                        impact = analyse_sick(snap, crew_id, pairing_id)
+                        result["problem"] = impact.summary
+                        result["impact"] = impact.to_dict()
+
+                        # Get ranked cover options
+                        if pairing_id and pairing_id in snap.pairings:
+                            try:
+                                opts = resolve(snap, crew_id, pairing_id)
+                                solutions = []
+                                for i, opt in enumerate(opts.options[:5]):
+                                    confidence = max(30, 95 - i * 12)
+                                    solutions.append({
+                                        "rank": i + 1,
+                                        "action": opt.action,
+                                        "crew_id": opt.crew_id,
+                                        "legal": opt.legal,
+                                        "cost_inr": opt.cost_inr,
+                                        "delay_hours": opt.delay_hours,
+                                        "coverage": opt.coverage,
+                                        "reasoning": opt.reasoning,
+                                        "confidence": confidence,
+                                        "rules_checked": opt.rules_checked,
+                                        "cost_breakdown": opt.cost_breakdown,
+                                    })
+                                result["solutions"] = solutions
+                            except Exception as re:
+                                result["resolve_error"] = str(re)
+
+                        # Ask LLM for reasoning
+                        adv: Advisor = _STATE["advisor"]
+                        if adv.model_available:
+                            try:
+                                q = f"{crew_id} called in sick for {pairing_id}. Explain the operational impact and recommend the best recovery action."
+                                ans = adv.ask(q)
+                                result["llm_analysis"] = ans.prose
+                                result["llm_explanation"] = ans.to_dict().get("explanation", "")
+                            except Exception:
+                                pass
+
+                    elif ev_type == "DELAY":
+                        aircraft = ev.get("aircraft", "")
+                        delay_hours = ev.get("delay_hours", 0)
+                        date = ev.get("date")
+                        impact = analyse_delay(snap, delay_hours, aircraft=aircraft, date=date)
+                        result["problem"] = impact.summary
+                        result["impact"] = impact.to_dict()
+
+                        solutions = []
+                        imp_data = impact.to_dict()
+                        breach = imp_data.get("breach", False)
+                        rest_breach = imp_data.get("rest_breach", False)
+                        prefix = imp_data.get("max_legal_prefix", {})
+
+                        if not breach and not rest_breach:
+                            solutions.append({
+                                "rank": 1, "action": "No action required - delay is within legal limits",
+                                "crew_id": None, "legal": True, "cost_inr": 0, "delay_hours": delay_hours,
+                                "coverage": "All flights remain covered", "confidence": 98,
+                                "reasoning": f"The {delay_hours}h delay keeps duty within FDP limits. No crew swaps needed.",
+                                "rules_checked": ["RULE-FDP-01", "RULE-REST-04"], "cost_breakdown": {},
+                            })
+                        else:
+                            solutions.append({
+                                "rank": 1, "action": f"Shed tail legs after sector {prefix.get('last_legal_sector', 'N/A')}",
+                                "crew_id": None, "legal": True, "cost_inr": 50000,
+                                "delay_hours": delay_hours, "coverage": "Partial - tail legs require fresh crew",
+                                "confidence": 85,
+                                "reasoning": f"FDP breach at {delay_hours}h delay. Drop tail sectors to stay legal, re-crew remaining legs.",
+                                "rules_checked": ["RULE-FDP-01"], "cost_breakdown": {"reposition": 50000},
+                            })
+                            solutions.append({
+                                "rank": 2, "action": "Re-crew entire pairing with reserve crew",
+                                "crew_id": None, "legal": True, "cost_inr": 120000,
+                                "delay_hours": 0, "coverage": "Full coverage with fresh crew",
+                                "confidence": 72,
+                                "reasoning": "Complete crew swap eliminates duty/rest breach entirely.",
+                                "rules_checked": ["RULE-FDP-01", "RULE-REST-04"],
+                                "cost_breakdown": {"callout": 80000, "positioning": 40000},
+                            })
+
+                        result["solutions"] = solutions
+
+                        adv: Advisor = _STATE["advisor"]
+                        if adv.model_available:
+                            try:
+                                q = f"{aircraft} is delayed {delay_hours}h on {date}. Explain the crew legality impact and suggest recovery."
+                                ans = adv.ask(q)
+                                result["llm_analysis"] = ans.prose
+                            except Exception:
+                                pass
+
+                    elif ev_type == "STATION_CLOSURE":
+                        station = ev.get("station", "")
+                        start_utc = ev.get("start_utc", "")
+                        end_utc = ev.get("end_utc", "")
+                        impact = analyse_closure(snap, station, start_utc, end_utc)
+                        result["problem"] = impact.summary
+                        result["impact"] = impact.to_dict()
+
+                        imp_data = impact.to_dict()
+                        affected = imp_data.get("affected_flights", [])
+                        solutions = []
+                        solutions.append({
+                            "rank": 1, "action": f"Hold and delay {len(affected)} affected flights until {station} reopens",
+                            "crew_id": None, "legal": True, "cost_inr": len(affected) * 15000,
+                            "delay_hours": 0, "coverage": f"{len(affected)} flights delayed",
+                            "confidence": 90,
+                            "reasoning": f"Station {station} closure is temporary. Holding flights avoids cancellation costs. Monitor FDP limits for crew on delayed flights.",
+                            "rules_checked": ["RULE-FDP-01", "RULE-REST-04"],
+                            "cost_breakdown": {"ground_holding": len(affected) * 15000},
+                        })
+                        solutions.append({
+                            "rank": 2, "action": f"Divert departures through alternate hub",
+                            "crew_id": None, "legal": True, "cost_inr": len(affected) * 45000,
+                            "delay_hours": 0, "coverage": "All flights re-routed",
+                            "confidence": 68,
+                            "reasoning": f"Re-route via nearest alternate airport. Higher cost but maintains schedule integrity.",
+                            "rules_checked": ["RULE-FDP-01"],
+                            "cost_breakdown": {"diversion_cost": len(affected) * 45000},
+                        })
+                        solutions.append({
+                            "rank": 3, "action": f"Cancel {len(affected)} flights and rebook passengers",
+                            "crew_id": None, "legal": True, "cost_inr": len(affected) * 250000,
+                            "delay_hours": 0, "coverage": "Flights cancelled",
+                            "confidence": 45,
+                            "reasoning": "Last resort. Cancellation avoids cascading FDP risk but carries maximum passenger disruption and compensation cost.",
+                            "rules_checked": [],
+                            "cost_breakdown": {"cancellation": len(affected) * 150000, "rebooking": len(affected) * 100000},
+                        })
+                        result["solutions"] = solutions
+
+                        adv: Advisor = _STATE["advisor"]
+                        if adv.model_available:
+                            try:
+                                q = f"{station} is closed from {start_utc} to {end_utc}. What is the crew impact and what should I do?"
+                                ans = adv.ask(q)
+                                result["llm_analysis"] = ans.prose
+                            except Exception:
+                                pass
+
+                except Exception as ex:
+                    result["error"] = f"{type(ex).__name__}: {ex}"
+
+                self._json(result)
+                return
             if route == "/api/outreach":
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")

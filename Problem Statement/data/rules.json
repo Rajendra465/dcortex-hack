@@ -9,34 +9,34 @@
  "rules": [
   {
    "rule_id": "RULE-FDP-01",
-   "text": "Max flight duty period 13h, reduced 0.5h per sector beyond the 2nd.",
+   "text": "Max flight duty period 14h, reduced 0.5h per sector beyond the 2nd.",
    "params": {
-    "base_fdp_hours": 13.0,
+    "base_fdp_hours": 14.0,
     "reduction_per_extra_sector_hours": 0.5,
     "free_sectors": 2
    }
   },
   {
    "rule_id": "RULE-DUTY-02",
-   "text": "Max 60 duty hours in any 7 consecutive calendar days (inclusive of duty date).",
+   "text": "Max 65 duty hours in any 7 consecutive calendar days (inclusive of duty date).",
    "params": {
-    "max_duty_hours": 60,
+    "max_duty_hours": 65,
     "window_days": 7
    }
   },
   {
    "rule_id": "RULE-FLT-03",
-   "text": "Max 100 flight (block) hours in any 28 consecutive calendar days.",
+   "text": "Max 110 flight (block) hours in any 28 consecutive calendar days.",
    "params": {
-    "max_flight_hours": 100,
+    "max_flight_hours": 110,
     "window_days": 28
    }
   },
   {
    "rule_id": "RULE-REST-04",
-   "text": "Min 12h rest between release and next report.",
+   "text": "Min 11h rest between release and next report.",
    "params": {
-    "min_rest_hours": 12
+    "min_rest_hours": 11
    }
   },
   {

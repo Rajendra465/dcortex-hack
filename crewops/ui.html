@@ -1027,6 +1027,77 @@ input, select { font: inherit; color: inherit; }
 }
 
 .toast-bar.show { transform: translateY(0); opacity: 1; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Threat Resolution Modal */
+.resolve-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+    z-index: 9999; display: none; align-items: center; justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+.resolve-overlay.active { display: flex; }
+.resolve-panel {
+    background: var(--surface-card); border: 1px solid var(--border-subtle);
+    border-radius: 16px; width: 90vw; max-width: 820px; max-height: 85vh;
+    overflow-y: auto; padding: 0; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.resolve-header {
+    padding: 20px 24px; border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surface-card); z-index: 1;
+    border-radius: 16px 16px 0 0;
+}
+.resolve-header h3 { margin: 0; color: var(--ink-primary); font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+.resolve-close { background: none; border: none; color: var(--ink-muted); font-size: 1.2rem; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
+.resolve-close:hover { background: var(--border-subtle); color: var(--ink-primary); }
+.resolve-body { padding: 20px 24px; }
+.resolve-problem {
+    background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+    color: var(--ink-primary); font-size: 0.82rem; line-height: 1.5;
+}
+.resolve-problem strong { color: #ef4444; }
+.resolve-llm {
+    background: var(--brand-green-soft); border: 1px solid var(--brand-green);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+    color: var(--ink-primary); font-size: 0.8rem; line-height: 1.6;
+}
+.resolve-llm-label { color: var(--brand-green-strong); font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.resolve-solutions-title { color: var(--ink-primary); font-size: 0.85rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.solution-card {
+    background: var(--surface-base); border: 1px solid var(--border-subtle);
+    border-radius: 12px; padding: 16px; margin-bottom: 12px;
+    transition: all 0.2s ease; cursor: default;
+}
+.solution-card:hover { border-color: var(--brand-green); box-shadow: 0 2px 12px rgba(16, 185, 129, 0.1); }
+.solution-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.solution-rank { font-size: 0.65rem; font-weight: 700; color: #fff; background: var(--brand-green-strong); border-radius: 6px; padding: 2px 8px; }
+.solution-confidence { font-size: 0.7rem; font-weight: 600; font-family: var(--font-mono); }
+.confidence-high { color: #10b981; }
+.confidence-mid { color: #f59e0b; }
+.confidence-low { color: #ef4444; }
+.solution-action { color: var(--ink-primary); font-weight: 600; font-size: 0.82rem; margin-bottom: 6px; }
+.solution-reasoning { color: var(--ink-secondary); font-size: 0.75rem; line-height: 1.5; margin-bottom: 10px; }
+.solution-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.solution-meta-tag { font-size: 0.65rem; padding: 2px 8px; border-radius: 6px; font-family: var(--font-mono); }
+.solution-cost { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.solution-legal { background: var(--brand-green-soft); color: var(--brand-green-strong); border: 1px solid var(--brand-green); }
+.solution-rules { background: rgba(99, 102, 241, 0.1); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); }
+.solution-apply-btn {
+    background: var(--brand-green-strong); color: #fff; border: none;
+    padding: 8px 20px; border-radius: 8px; font-weight: 600; font-size: 0.78rem;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+}
+.solution-apply-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+.resolve-loading {
+    text-align: center; padding: 40px; color: var(--ink-muted);
+}
+.resolve-loading i { font-size: 2rem; color: var(--brand-green-strong); margin-bottom: 12px; display: block; }
     </style>
 </head>
 <body>
@@ -1087,10 +1158,10 @@ input, select { font: inherit; color: inherit; }
                     <i class="fa-solid fa-bell"></i>
                 </button>
 
-                <!-- Duty Chief Profile -->
+                <!-- Admin Profile -->
                 <div class="user-profile-widget" onclick="switchOCCView('audit')">
-                    <div class="user-avatar-circle">RS</div>
-                    <span style="font-size:0.8rem; font-weight:600; color:var(--ink-primary);">Capt. R. Sharma ⌵</span>
+                    <div class="user-avatar-circle"><i class="fa-solid fa-user-shield" style="font-size:0.7rem;"></i></div>
+                    <span style="font-size:0.8rem; font-weight:600; color:var(--ink-primary);">Admin ⌵</span>
                 </div>
             </div>
         </header>
@@ -1190,30 +1261,10 @@ input, select { font: inherit; color: inherit; }
                         <h4><i class="fa-solid fa-triangle-exclamation" style="color:var(--brand-orange)"></i> Threat Stream</h4>
                         <span style="font-size:0.68rem; color:var(--brand-green-strong); font-family:var(--font-mono);">Live Stream</span>
                     </div>
-                    <div style="overflow-y:auto; flex:1;">
-                        <div class="threat-event-item">
-                            <div class="threat-badge-row">
-                                <span class="threat-pill red">Critical · S1</span>
-                                <span style="font-size:0.65rem; color:var(--ink-muted);">15 Sep 05:00Z</span>
-                            </div>
-                            <strong style="color:var(--ink-primary); margin-top:2px;">Capt. C-1042 Sick Call</strong>
-                            <span style="color:var(--ink-secondary); font-size:0.7rem;">Uncrewed legs on P-2291 (AI-801/802/803). 486 pax at risk.</span>
-                        </div>
-                        <div class="threat-event-item">
-                            <div class="threat-badge-row">
-                                <span class="threat-pill amber">Warning · Pre-emptive</span>
-                                <span style="font-size:0.65rem; color:var(--ink-muted);">15 Sep 04:30Z</span>
-                            </div>
-                            <strong style="color:var(--ink-primary); margin-top:2px;">FO C-2087 Approaching 60h Cap</strong>
-                            <span style="color:var(--ink-secondary); font-size:0.7rem;">Current 7D duty 51.5h. Additional duty would breach CAR limit.</span>
-                        </div>
-                        <div class="threat-event-item">
-                            <div class="threat-badge-row">
-                                <span class="threat-pill red">Critical · S4</span>
-                                <span style="font-size:0.65rem; color:var(--ink-muted);">17 Sep 08:00Z</span>
-                            </div>
-                            <strong style="color:var(--ink-primary); margin-top:2px;">BLR Hub Closure Notice</strong>
-                            <span style="color:var(--ink-secondary); font-size:0.7rem;">Fuel farm outage. 6 sectors affected. Cascading FDP risk.</span>
+                    <div id="threatFeedBody" style="overflow-y:auto; flex:1;">
+                        <div style="padding:16px; text-align:center; color:var(--ink-muted); font-size:0.75rem;">
+                            <i class="fa-solid fa-satellite-dish fa-beat-fade" style="font-size:1.2rem; color:var(--brand-orange); margin-bottom:8px; display:block;"></i>
+                            Waiting for live events...
                         </div>
                     </div>
                 </div>
@@ -1529,10 +1580,16 @@ DGCA CAR Section 7 Legality:
         eventSource.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                if (data.scenario) {
-                    showToast(`📡 Live Event Received: ${data.title}`);
-                    // Automatically trigger the scenario locally in the dashboard
-                    triggerScenario(data.scenario, data.dynamic_event);
+                if (data.scenario && data.dynamic_event) {
+                    showToast(`📡 Live Event: ${data.title}`);
+                    // Push to threat feed panel only — do NOT inject into chat
+                    appendThreatFeedEvent(data);
+                    // Push the event into the solver state silently
+                    fetch('/api/whatif', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({scenario: data.scenario, dynamic_event: data.dynamic_event, session: STATE.session})
+                    }).catch(() => {});
                 }
             } catch (e) {
                 console.error("Error parsing live stream data", e);
@@ -1545,6 +1602,66 @@ DGCA CAR Section 7 Legality:
             statusEl.previousElementSibling.style.color = "#ef4444";
             statusEl.previousElementSibling.style.background = "rgba(239, 68, 68, 0.15)";
         };
+    }
+
+    // Append a live event card to the Threat Stream panel (left sidebar)
+    function appendThreatFeedEvent(data) {
+        const feed = document.getElementById('threatFeedBody');
+        // Remove the "Waiting..." placeholder if it's the first event
+        if (feed.querySelector('[data-placeholder]') || feed.children.length === 1 && feed.children[0].textContent.includes('Waiting')) {
+            feed.innerHTML = '';
+        }
+
+        const ev = data.dynamic_event || {};
+        const now = new Date();
+        const ts = now.toUTCString().split(' ').slice(1, 4).join(' ') + ' ' + now.toISOString().split('T')[1].substring(0, 5) + 'Z';
+
+        let pillClass = 'amber';
+        let pillLabel = 'Warning';
+        let title = data.title || 'Unknown Event';
+        let desc = '';
+
+        if (ev.type === 'SICK_CREW') {
+            pillClass = 'red';
+            pillLabel = 'Critical · Sick';
+            title = `${ev.crew_id} Sick Call`;
+            desc = `Crew member ${ev.crew_id} reported sick${ev.pairing_id ? '. Pairing ' + ev.pairing_id + ' affected.' : '.'}`;
+        } else if (ev.type === 'DELAY') {
+            pillClass = 'amber';
+            pillLabel = `Warning · ${ev.delay_hours}h Delay`;
+            title = `${ev.aircraft} Delayed ${ev.delay_hours}h`;
+            desc = `Aircraft ${ev.aircraft} delayed by ${ev.delay_hours}h on ${ev.date}. FDP assessment required.`;
+        } else if (ev.type === 'STATION_CLOSURE') {
+            pillClass = 'red';
+            pillLabel = 'Critical · Closure';
+            title = `${ev.station} Station Closure`;
+            desc = `${ev.station} closed from ${ev.start_utc} to ${ev.end_utc}. Departures and arrivals suspended.`;
+        }
+
+        const item = document.createElement('div');
+        item.className = 'threat-event-item';
+        item.style.animation = 'fadeIn 0.4s ease';
+        item.style.cursor = 'pointer';
+        item.onclick = function() {
+            openResolveModal(data, this);
+        };
+        item.innerHTML = `
+            <div class="threat-badge-row">
+                <span class="threat-pill ${pillClass}">${pillLabel}</span>
+                <span style="font-size:0.65rem; color:var(--ink-muted);">${ts}</span>
+            </div>
+            <strong style="color:var(--ink-primary); margin-top:2px;">${escapeHtml(title)}</strong>
+            <span style="color:var(--ink-secondary); font-size:0.7rem;">${escapeHtml(desc)}</span>
+            <span style="font-size:0.6rem; color:var(--brand-green-strong); margin-top:4px; cursor:pointer;">⬆ Click to ask advisor about this event</span>
+        `;
+
+        // Prepend (newest first)
+        feed.insertBefore(item, feed.firstChild);
+
+        // Keep max 20 events
+        while (feed.children.length > 20) {
+            feed.removeChild(feed.lastChild);
+        }
     }
 
     // 1. Theme Engine (frontend-next Light/Dark Theme)
@@ -2081,6 +2198,176 @@ CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
             console.error("Error setting region", e);
         }
     }
+    </script>
+
+    <!-- Threat Resolution Modal -->
+    <div class="resolve-overlay" id="resolveOverlay">
+        <div class="resolve-panel">
+            <div class="resolve-header">
+                <h3><i class="fa-solid fa-bolt" style="color:var(--brand-orange)"></i> <span id="resolveTitle">Event Resolution</span></h3>
+                <button class="resolve-close" onclick="closeResolveModal()">&times;</button>
+            </div>
+            <div class="resolve-body" id="resolveBody">
+                <div class="resolve-loading">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    <div>Analyzing event and computing ranked solutions...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ---- Threat Resolution System ----
+    let _activeResolveEventId = null;
+
+    function openResolveModal(data, eventItemEl) {
+        const overlay = document.getElementById('resolveOverlay');
+        const body = document.getElementById('resolveBody');
+        const title = document.getElementById('resolveTitle');
+        const ev = data.dynamic_event || {};
+
+        _activeResolveEventId = eventItemEl;
+
+        let titleText = 'Event Resolution';
+        if (ev.type === 'SICK_CREW') titleText = `Sick Call: ${ev.crew_id}`;
+        else if (ev.type === 'DELAY') titleText = `Delay: ${ev.aircraft} (${ev.delay_hours}h)`;
+        else if (ev.type === 'STATION_CLOSURE') titleText = `Station Closure: ${ev.station}`;
+        title.textContent = titleText;
+
+        body.innerHTML = `
+            <div class="resolve-loading">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <div>Running DGCA CAR Section 7 solver and LLM analysis...</div>
+                <div style="font-size:0.7rem; margin-top:8px; color:var(--ink-muted);">Evaluating legality constraints, ranked cover options, and generating reasoning...</div>
+            </div>
+        `;
+        overlay.classList.add('active');
+
+        fetch('/api/resolve_event', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({dynamic_event: ev, session: STATE.session})
+        })
+        .then(r => r.json())
+        .then(result => renderResolution(body, result, ev, eventItemEl))
+        .catch(err => {
+            body.innerHTML = `<div class="resolve-problem"><strong>Error:</strong> ${err.message}</div>`;
+        });
+    }
+
+    function renderResolution(container, result, ev, eventItemEl) {
+        let html = '';
+
+        // Problem Statement
+        html += `<div class="resolve-problem">
+            <strong><i class="fa-solid fa-triangle-exclamation"></i> Problem Identified</strong><br>
+            ${escapeHtml(result.problem || 'Unable to determine impact.')}
+        </div>`;
+
+        // LLM Analysis
+        if (result.llm_analysis) {
+            html += `<div class="resolve-llm">
+                <div class="resolve-llm-label"><i class="fa-solid fa-brain"></i> AI Analysis (LLM-Powered)</div>
+                ${escapeHtml(result.llm_analysis)}
+            </div>`;
+        }
+
+        // Solutions
+        const solutions = result.solutions || [];
+        if (solutions.length > 0) {
+            html += `<div class="resolve-solutions-title">
+                <i class="fa-solid fa-ranking-star" style="color:var(--brand-green-strong)"></i>
+                Ranked Recovery Options (${solutions.length})
+            </div>`;
+
+            solutions.forEach((sol, idx) => {
+                const conf = sol.confidence || 0;
+                const confClass = conf >= 80 ? 'confidence-high' : conf >= 60 ? 'confidence-mid' : 'confidence-low';
+                const confBar = Math.min(100, conf);
+                const costStr = sol.cost_inr ? `₹${sol.cost_inr.toLocaleString('en-IN')}` : 'No cost';
+                const rulesStr = (sol.rules_checked || []).join(', ') || 'N/A';
+
+                html += `<div class="solution-card" id="sol-${idx}">
+                    <div class="solution-card-header">
+                        <span class="solution-rank">#${sol.rank} ${sol.crew_id ? sol.crew_id : ''}</span>
+                        <span class="solution-confidence ${confClass}">
+                            <i class="fa-solid fa-chart-simple"></i> ${conf}% confidence
+                        </span>
+                    </div>
+                    <div style="height:3px; background:var(--border-subtle); border-radius:2px; margin-bottom:10px; overflow:hidden;">
+                        <div style="height:100%; width:${confBar}%; background:${conf >= 80 ? '#10b981' : conf >= 60 ? '#f59e0b' : '#ef4444'}; border-radius:2px; transition: width 0.6s ease;"></div>
+                    </div>
+                    <div class="solution-action"><i class="fa-solid fa-check-circle" style="color:var(--brand-green-strong)"></i> ${escapeHtml(sol.action)}</div>
+                    <div class="solution-reasoning">
+                        <strong style="color:var(--ink-primary);">Reasoning:</strong> ${escapeHtml(sol.reasoning || 'No additional reasoning available.')}
+                    </div>
+                    <div class="solution-meta">
+                        <span class="solution-meta-tag solution-cost"><i class="fa-solid fa-indian-rupee-sign"></i> ${costStr}</span>
+                        <span class="solution-meta-tag solution-legal"><i class="fa-solid fa-shield-check"></i> ${sol.legal ? 'Legal' : 'Breach'}</span>
+                        <span class="solution-meta-tag solution-rules"><i class="fa-solid fa-book"></i> ${rulesStr}</span>
+                        ${sol.coverage ? `<span class="solution-meta-tag" style="background:rgba(99,102,241,0.08); color:var(--ink-secondary); border:1px solid var(--border-subtle);"><i class="fa-solid fa-plane"></i> ${escapeHtml(sol.coverage)}</span>` : ''}
+                    </div>
+                    <button class="solution-apply-btn" onclick="applyFix(${idx}, '${escapeHtml(sol.action)}')">
+                        <i class="fa-solid fa-wrench"></i> Apply This Fix
+                    </button>
+                </div>`;
+            });
+        } else {
+            html += `<div style="text-align:center; color:var(--ink-muted); padding:20px;">
+                <i class="fa-solid fa-circle-info" style="font-size:1.5rem; margin-bottom:8px; display:block; color:var(--brand-orange);"></i>
+                No automated solutions available. Use the chat to ask the advisor for guidance.
+            </div>`;
+        }
+
+        container.innerHTML = html;
+    }
+
+    function applyFix(solutionIdx, actionText) {
+        const solCard = document.getElementById(`sol-${solutionIdx}`);
+        if (solCard) {
+            solCard.style.border = '2px solid var(--brand-green-strong)';
+            solCard.style.background = 'var(--brand-green-soft)';
+            const btn = solCard.querySelector('.solution-apply-btn');
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Fix Applied';
+                btn.disabled = true;
+                btn.style.opacity = '0.7';
+            }
+        }
+
+        showToast(`✅ Fix applied: ${actionText}`);
+
+        // Remove the event from the threat feed
+        if (_activeResolveEventId && _activeResolveEventId.parentNode) {
+            _activeResolveEventId.style.animation = 'fadeIn 0.3s ease reverse';
+            setTimeout(() => {
+                if (_activeResolveEventId.parentNode) {
+                    _activeResolveEventId.parentNode.removeChild(_activeResolveEventId);
+                }
+                // If feed is empty, show placeholder
+                const feed = document.getElementById('threatFeedBody');
+                if (feed && feed.children.length === 0) {
+                    feed.innerHTML = `<div style="padding:16px; text-align:center; color:var(--ink-muted); font-size:0.75rem;">
+                        <i class="fa-solid fa-circle-check" style="font-size:1.2rem; color:var(--brand-green-strong); margin-bottom:8px; display:block;"></i>
+                        All events resolved. Monitoring for new events...
+                    </div>`;
+                }
+            }, 300);
+        }
+
+        // Close modal after a brief pause
+        setTimeout(() => closeResolveModal(), 800);
+    }
+
+    function closeResolveModal() {
+        document.getElementById('resolveOverlay').classList.remove('active');
+        _activeResolveEventId = null;
+    }
+
+    // Close modal on overlay click
+    document.getElementById('resolveOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeResolveModal();
+    });
     </script>
 </body>
 </html>
