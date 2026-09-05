@@ -297,12 +297,13 @@ class Snapshot:
 # loader
 # --------------------------------------------------------------------------
 
-DEFAULT_DATA_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "extracted",
-    "DCortex - Synthetic dataset",
-    "data",
-)
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CANDIDATE_DIRS = [
+    os.path.join(_ROOT, "Problem Statement", "data"),
+    os.path.join(_ROOT, "extracted", "DCortex - Synthetic dataset", "data"),
+    os.path.join(_ROOT, "data"),
+]
+DEFAULT_DATA_DIR = next((p for p in _CANDIDATE_DIRS if os.path.isdir(p)), _CANDIDATE_DIRS[0])
 
 
 def _read(data_dir: str, name: str) -> Any:
