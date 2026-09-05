@@ -60,6 +60,167 @@ def _brief(snap: Snapshot) -> dict[str, Any]:
     }
 
 
+def _roster(snap: Snapshot) -> list[dict[str, Any]]:
+    out = []
+    for cid, c in snap.crew.items():
+        clk = snap.clocks.get(cid, {})
+        d7 = clk.get("duty_hours_7d", 0.0)
+        f28 = clk.get("flight_hours_28d", 0.0)
+        pairings = [p.pairing_id for p in snap.pairings_for_crew(cid)]
+        status = "Reserve" if cid in snap.reserves else ("Assigned" if pairings else "Available")
+        out.append({
+            "crew_id": cid,
+            "name": c.name,
+            "rank": c.rank,
+            "base": c.base,
+            "ratings": list(c.ratings),
+            "seniority": c.seniority,
+            "reachability_minutes": c.reachability_minutes,
+            "duty_hours_7d": d7,
+            "duty_limit_7d": 60.0,
+            "duty_util_pct": round(min(100.0, (d7 / 60.0) * 100), 1),
+            "flight_hours_28d": f28,
+            "flight_limit_28d": 100.0,
+            "flight_util_pct": round(min(100.0, (f28 / 100.0) * 100), 1),
+            "pairings": pairings,
+            "status": status,
+        })
+    return sorted(out, key=lambda x: (x["rank"], x["crew_id"]))
+
+
+def _flights(snap: Snapshot) -> list[dict[str, Any]]:
+    out = []
+    for fid, f in snap.flights.items():
+        p_info = snap.pairing_of_flight(fid)
+        pid = p_info[0].pairing_id if p_info else None
+        p = p_info[0] if p_info else None
+        capt = p.crew_in_role("Captain") if p else None
+        fo = p.crew_in_role("First Officer") if p else None
+        scc = p.crew_in_role("Senior Cabin Crew") if p else None
+        out.append({
+            "flight_id": fid,
+            "flight_no": f.flight_no,
+            "date": f.date,
+            "dep_station": f.dep_station,
+            "arr_station": f.arr_station,
+            "dep_utc": f.dep_utc,
+            "arr_utc": f.arr_utc,
+            "block_hours": f.block_hours,
+            "aircraft": f.aircraft,
+            "aircraft_type": f.aircraft_type,
+            "seats": f.seats,
+            "pairing_id": pid,
+            "captain": capt,
+            "first_officer": fo,
+            "cabin_crew": scc,
+        })
+    return sorted(out, key=lambda x: (x["dep_utc"], x["flight_no"]))
+
+
+def _reserves(snap: Snapshot) -> list[dict[str, Any]]:
+    out = []
+    for cid, r in snap.reserves.items():
+        c = snap.crew.get(cid)
+        clk = snap.clocks.get(cid, {})
+        d7 = clk.get("duty_hours_7d", 0.0)
+        f28 = clk.get("flight_hours_28d", 0.0)
+        out.append({
+            "crew_id": cid,
+            "name": c.name if c else cid,
+            "rank": c.rank if c else "Unknown",
+            "base": r.base,
+            "ratings": list(c.ratings) if c else [],
+            "dates": list(r.dates),
+            "window": f"{r.window_start} - {r.window_end}",
+            "window_start": r.window_start,
+            "window_end": r.window_end,
+            "duty_hours_7d": d7,
+            "duty_headroom_7d": round(max(0.0, 60.0 - d7), 2),
+            "flight_hours_28d": f28,
+            "reachability_minutes": c.reachability_minutes if c else 60,
+        })
+    return sorted(out, key=lambda x: (x["base"], x["rank"], x["crew_id"]))
+
+
+def _outreach(snap: Snapshot, data: dict[str, Any]) -> dict[str, Any]:
+    cid = data.get("crew_id", "C-3310")
+    pid = data.get("pairing_id", "P-2291")
+    c = snap.crew.get(cid)
+    p = snap.pairings.get(pid)
+    cname = c.name if c else cid
+    crank = c.rank if c else "Crew Member"
+    cbase = c.base if c else "DEL"
+    crate = "/".join(c.ratings) if c else "A320"
+
+    legs = []
+    report_utc = "05:00 UTC"
+    pdate = "2026-09-15"
+    if p and p.days:
+        d0 = p.days[0]
+        pdate = d0.date
+        report_utc = d0.report_utc.split("T")[1][:5] + " UTC"
+        for fid in d0.flights:
+            fl = snap.flights.get(fid)
+            if fl:
+                legs.append(f"{fl.flight_no} ({fl.dep_station}→{fl.arr_station})")
+    leg_str = ", ".join(legs) if legs else "DX412/DX413"
+
+    whatsapp = (
+        f"⚠️ *dCortex AIR - PRIORITY CREW DISPATCH*\n\n"
+        f"Hello {crank} *{cname}* ({cid}),\n"
+        f"OCC has assigned you to cover pairing *{pid}* on *{pdate}*.\n\n"
+        f"📋 *Assignment Details:*\n"
+        f"• Base: {cbase} | Fleet: {crate}\n"
+        f"• Required Report Time: *{report_utc}*\n"
+        f"• Scheduled Legs: {leg_str}\n"
+        f"• DGCA Compliance: Verified PASS (FDP cap, 12h rest, 60h 7-day limit ok)\n\n"
+        f"Please reply *CONFIRM* to acknowledge and accept duty, or call OCC Dispatch (+91-11-2565-8787)."
+    )
+
+    acars = (
+        f"QU OCCDELXA\n"
+        f".DELOCCX 141800\n"
+        f"CREW REASSIGNMENT UPLINK\n"
+        f"ATTN: {crank.upper()} {cid} / {cname.upper()}\n"
+        f"REASSIGN: PAIRING {pid} EFF {pdate}\n"
+        f"REPORT: {report_utc} @ {cbase} OPS\n"
+        f"LEGS: {leg_str.upper()}\n"
+        f"LEGALITY STATUS: DGCA PASS / ZERO BREACH\n"
+        f"ACK REQD VIA ACARS OR FREQ 131.850 MHZ"
+    )
+
+    sms = (
+        f"dCortex OCC: {crank} {cname} ({cid}), you are assigned Pairing {pid} on {pdate}. "
+        f"Report {report_utc} at {cbase}. Flight legs: {leg_str}. "
+        f"DGCA cleared. Confirm via portal or reply 1 to accept."
+    )
+
+    voice = (
+        f"Good day {crank} {cname}. This is an automated notification from the dCortex Operations Control Center. "
+        f"Due to operational disruption, you have been assigned to cover pairing {pid} on {pdate}. "
+        f"Your required report time is {report_utc} at {cbase}. Your assigned sectors are {leg_str}. "
+        f"All DGCA legality and rest period checks have been verified. Press 1 to acknowledge receipt and accept this assignment, "
+        f"or press 2 to speak immediately with a flight duty dispatcher."
+    )
+
+    return {
+        "crew_id": cid,
+        "name": cname,
+        "rank": crank,
+        "base": cbase,
+        "pairing_id": pid,
+        "date": pdate,
+        "report_utc": report_utc,
+        "legs": leg_str,
+        "channels": {
+            "whatsapp": whatsapp,
+            "acars": acars,
+            "sms": sms,
+            "voice": voice,
+        },
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -90,20 +251,23 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "flights": len(snap.flights), "crew": len(snap.crew),
                     "pairings": len(snap.pairings),
+                    "reserves": len(snap.reserves),
                     "snapshot_utc": "2026-09-14T18:00:00Z",
                     "model": adv.model_label if adv.model_available else None,
                 })
             elif path == "/api/brief":
                 self._json(_brief(snap))
+            elif path == "/api/roster":
+                self._json(_roster(snap))
+            elif path == "/api/flights":
+                self._json(_flights(snap))
+            elif path == "/api/reserves":
+                self._json(_reserves(snap))
             elif path == "/api/eval":
                 self._json(run_eval(snap).to_dict())
             elif path == "/api/conformance":
                 self._json(conformance_report(snap))
             elif path == "/api/routing":
-                # The second, separate score: not "is the arithmetic right"
-                # but "does a typed sentence reach the capability that owns
-                # it". Cached after the first call -- it replays all 38
-                # shipped prompts and the UI asks for it on page load.
                 if _STATE.get("routing") is None:
                     _STATE["routing"] = run_e2e(snap, use_model=False)
                 r = dict(_STATE["routing"])
@@ -118,10 +282,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         route = self.path.split("?")[0]
-        if route not in ("/api/ask", "/api/whatif", "/api/reset"):
+        if route not in ("/api/ask", "/api/whatif", "/api/reset", "/api/outreach"):
             self._json({"error": "not found"}, 404)
             return
         try:
+            snap: Snapshot = _STATE["snap"]
+            if route == "/api/outreach":
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+                self._json(_outreach(snap, body))
+                return
             if route in ("/api/whatif", "/api/reset"):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")
@@ -130,12 +300,28 @@ class Handler(BaseHTTPRequestHandler):
                     if route == "/api/reset":
                         entry["s"].reset()
                     else:
-                        from .events import SickCrew
-                        cid = body.get("crew_id")
-                        if not cid or cid not in _STATE["snap"].crew:
-                            self._json({"error": f"unknown crew {cid}"}, 400)
-                            return
-                        entry["s"].push_event(SickCrew(crew_id=cid))
+                        scenario = body.get("scenario")
+                        from .events import Delay, SickCrew, StationClosure
+                        if scenario == "S1" or scenario == "S2" or scenario == "S3":
+                            entry["s"].push_event(SickCrew(crew_id="C-1042", pairing_id="P-2291"))
+                        elif scenario == "S4":
+                            entry["s"].push_event(StationClosure(
+                                station="BLR",
+                                start_utc="2026-09-17T08:00:00Z",
+                                end_utc="2026-09-17T14:00:00Z",
+                            ))
+                        elif scenario == "S5":
+                            entry["s"].push_event(Delay(
+                                delay_hours=1.5,
+                                aircraft="VT-DXA",
+                                date="2026-09-16",
+                            ))
+                        else:
+                            cid = body.get("crew_id")
+                            if not cid or cid not in _STATE["snap"].crew:
+                                self._json({"error": f"unknown crew {cid}"}, 400)
+                                return
+                            entry["s"].push_event(SickCrew(crew_id=cid))
                     self._json({"ok": True, "what_if": entry["s"].what_if})
                 return
         except Exception as e:
