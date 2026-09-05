@@ -789,8 +789,15 @@ def bind_args(tool: str, ents: Entities, snap: Snapshot,
         a["end_utc"] = f"{day}T{ents.times[1]}:00Z"
     if tool == "compute_duty_period" and ents.dates and ents.times:
         a["release_utc"] = f"{ents.dates[0]}T{ents.times[0]}:00Z"
-    if tool == "find_flights" and re.search(r"\bhow many\b", question, re.I):
-        a["aggregate"] = "count"
+    if tool == "find_flights":
+        ql2 = question.lower()
+        if re.search(r"most seats|largest aircraft|seats at risk", ql2):
+            a["aggregate"] = "max_seats"
+        elif re.search(r"cancel", ql2) and re.search(
+                r"how many passenger|passengers.*(affect|cost)|what.*cost", ql2):
+            a["aggregate"] = "cancel_cost"
+        elif re.search(r"\bhow many\b", ql2):
+            a["aggregate"] = "count"
     if tool == "duty_hours" and re.search(r"\b(flight|block)\s*hour", question,
                                           re.I):
         a["metric"] = "flight"

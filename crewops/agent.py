@@ -860,8 +860,21 @@ def summarise(tool: str, p: Any) -> str:
                             f"{r['window']['start']}-{r['window']['end']}Z)"
                             for r in p["reserves"][:6]))
     if tool == "find_flights":
-        if "answer" in p:
-            return f"{p['answer']}"
+        ans = p.get("answer")
+        if isinstance(ans, dict) and "passengers" in ans:
+            return (f"{ans['passengers']} seats at risk across {ans['legs']} "
+                    f"leg(s). Cancelling costs INR {ans['cost_inr']:,}.")
+        if isinstance(ans, dict) and "seats" in ans and "flights" in ans:
+            # Every figure in this sentence has to exist in the ledger. The
+            # first version wrote "(+12 more)", and 12 was arithmetic done in
+            # the sentence rather than by the kernel -- so the guard blocked
+            # the answer. It was right to.
+            names = ", ".join(ans["flights"][:6])
+            tail = f" -- {ans['why']}." if ans.get("why") else ""
+            return (f"{ans['seats']} seats, the most of any leg. "
+                    f"{ans['count']} legs share it: {names}{tail}")
+        if ans is not None:
+            return f"{ans}"
         if not p["count"]:
             # "0 flight(s):" is a true answer that reads like a broken one. A
             # controller cannot tell whether nothing matched or the filter was

@@ -79,7 +79,7 @@ class Unanswerable(Exception):
        "arr_station": "3-letter code", "flight_no": "e.g. DX412",
        "aircraft": "e.g. VT-DXA", "aircraft_type": "A320 | ATR72",
        "dep_after_utc": "HH:MM", "dep_before_utc": "HH:MM",
-       "aggregate": "count | max_block | distinct_arr"},
+       "aggregate": "count | max_block | max_seats | cancel_cost | distinct_arr"},
       (), "retrieval",
       "Flights matching any combination of filters. Use `aggregate` so counting "
       "is never done by the model.")
@@ -119,6 +119,38 @@ def find_flights(snap: Snapshot, **kw: Any) -> Result:
         payload["answer"] = {"block_hours": mx,
                              "flights": sorted({f.flight_no for f in rows
                                                 if f.block_hours == mx})}
+    elif agg == "max_seats" and rows:
+        # "Which single leg has the most seats at risk if cancelled?" is a
+        # comparison, and no aggregate could express it -- so it answered with
+        # all 147 flights, which is every leg rather than the worst one.
+        mx = max(f.seats for f in rows)
+        worst = sorted({f.flight_no for f in rows if f.seats == mx})
+        others = sorted({f.seats for f in rows if f.seats != mx}, reverse=True)
+        led.add("max_seats", mx, "seats")
+        led.add("legs_at_max_seats", len(worst))
+        if others:
+            # The comparison number has to be in the ledger too. It went into
+            # the sentence and not the ledger, and the guard blocked the whole
+            # answer -- which is the guard doing its job, not a bug in it.
+            led.add("next_largest_seats", others[0], "seats")
+        payload["answer"] = {
+            "seats": mx, "flights": worst[:12], "count": len(worst),
+            "next_largest": others[0] if others else None,
+            "why": (f"{mx}-seat aircraft against {others[0]}-seat"
+                    if others else f"{mx} seats"),
+        }
+    elif agg == "cancel_cost" and rows:
+        # "How many passengers are affected and what does it cost?" needs the
+        # seats AND the rate, and the rate lives in costs.json. Answering with
+        # the flight row left the controller to do both lookups themselves.
+        seats = sum(f.seats for f in rows)
+        rate = snap.costs.get("cancellation_per_flight", 250000)
+        led.add("seats_at_risk", seats, "seats")
+        led.add("cancellation_per_flight", rate, "INR", source="costs.json")
+        led.add("cancellation_cost", rate * len(rows), "INR",
+                derivation=f"{rate} x {len(rows)} leg(s)")
+        payload["answer"] = {"passengers": seats, "legs": len(rows),
+                             "cost_inr": rate * len(rows)}
     elif agg == "distinct_arr":
         payload["answer"] = sorted({f.arr_station for f in rows})
     # Echo the filters that were applied. An empty result is only useful if it
