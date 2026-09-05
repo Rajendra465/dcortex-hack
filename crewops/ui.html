@@ -1027,7 +1027,51 @@ input, select { font: inherit; color: inherit; }
 }
 
 .toast-bar.show { transform: translateY(0); opacity: 1; }
-    </style>
+    
+/* ---- decision network: where the advisor could have gone another way ---- */
+.dnet{margin-top:14px;border:1px solid #dde3ea;border-radius:6px;overflow:hidden;background:rgba(127,127,127,.03)}
+.dnet-head{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;user-select:none;
+  border-bottom:1px solid transparent;font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;font-weight:700}
+.dnet.open .dnet-head{border-bottom-color:#dde3ea}
+.dnet-head .caret{transition:transform .18s;display:inline-block}
+.dnet.open .dnet-head .caret{transform:rotate(90deg)}
+.dnet-tallies{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;font-weight:600;letter-spacing:0;text-transform:none;font-size:.68rem}
+.dnet-pill{padding:2px 8px;border-radius:10px;background:rgba(127,127,127,.12)}
+.dnet-pill.ok{background:rgba(29,107,82,.14);color:#1d6b52}
+.dnet-pill.no{background:rgba(163,58,58,.14);color:#a33a3a}
+.dnet-body{display:none;padding:4px 0}
+.dnet.open .dnet-body{display:block}
+.dstage{display:grid;grid-template-columns:20px 108px minmax(0,1fr) auto;gap:0 10px;padding:7px 12px;
+  align-items:start;border-top:1px solid rgba(127,127,127,.10);font-size:.74rem;position:relative}
+.dstage:first-child{border-top:none}
+.dnode{width:9px;height:9px;border-radius:50%;margin-top:5px}
+.dstage::before{content:"";position:absolute;left:16.5px;top:15px;bottom:-7px;width:1px;background:rgba(127,127,127,.22)}
+.dstage:last-child::before{display:none}
+.k-gate .dnode{background:#1d6b52}
+.k-gate.blocked .dnode{background:#a33a3a}
+.k-derive .dnode{background:#1d3f6e}
+.k-choose .dnode{background:#8a5d0b}
+.k-speak .dnode{background:#6b4a8a}
+.dname{font-weight:600}
+.dkind{font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;opacity:.55;display:block;font-weight:500}
+.ddetail{opacity:.8;line-height:1.45}
+.dms{font-variant-numeric:tabular-nums;opacity:.5;font-size:.66rem;white-space:nowrap;padding-top:1px}
+.dopts{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}
+.dopt{font-size:.66rem;padding:2px 7px;border-radius:3px;background:rgba(127,127,127,.10);
+  border:1px solid transparent;font-family:ui-monospace,Menlo,Consolas,monospace}
+.dopt.win{background:rgba(29,107,82,.14);border-color:rgba(29,107,82,.4);color:#1d6b52;font-weight:600}
+.dopt .sc{opacity:.6;margin-left:4px}
+.dwhy{margin-top:5px;font-size:.67rem;opacity:.62;line-height:1.45}
+.dnet-foot{padding:8px 12px;border-top:1px solid #dde3ea;font-size:.66rem;opacity:.62;line-height:1.5}
+@media (prefers-color-scheme:dark){
+  .dnet{border-color:#2a3442}.dnet.open .dnet-head{border-bottom-color:#2a3442}.dnet-foot{border-top-color:#2a3442}
+  .k-gate .dnode{background:#6fc3a2}.k-gate.blocked .dnode{background:#e08585}
+  .k-derive .dnode{background:#7fa9dc}.k-choose .dnode{background:#d8ab57}.k-speak .dnode{background:#b394d0}
+  .dnet-pill.ok{background:rgba(111,195,162,.16);color:#6fc3a2}
+  .dnet-pill.no{background:rgba(224,133,133,.16);color:#e08585}
+  .dopt.win{background:rgba(111,195,162,.16);border-color:rgba(111,195,162,.4);color:#6fc3a2}
+}
+</style>
 </head>
 <body>
     <div class="app-container">
@@ -1594,6 +1638,68 @@ DGCA CAR Section 7 Legality:
         }
     }
 
+
+    // ---- decision network -------------------------------------------------
+    // Every point where the advisor could have gone another way, in order.
+    // Gates can refuse outright; choosers weighed rivals and remember what
+    // lost; the kernel derives; the narrator speaks last and is checked. The
+    // rejected options are the point -- "why not someone else" is the first
+    // thing a controller asks.
+    const DNET_BLURB = {
+      'scope': 'Is this about crew operations at all, and do we hold the kind of data it asks for?',
+      'horizon': 'Do the dates fall inside the week this dataset covers?',
+      'entity exists': 'Every crew id in the question is checked against the roster before anything runs.',
+      'entities': 'Crew, pairings, flights, dates and ranks lifted out of the sentence.',
+      'route': 'Capabilities score against the question. A lead below the bar goes to the model rather than guessing.',
+      'planners': 'Two independent planners: a deterministic index and the language model. Either can win, and the same validator judges both.',
+      'tool horizon': 'A second date check, now using the horizon of the capability actually chosen rather than the union of all of them.',
+      'plan valid': 'The typed plan is checked before a single kernel call: every argument bound, every reference resolvable.',
+      'kernel': 'Deterministic execution. This is where every number in the answer is produced.',
+      'candidates': 'Each crew member checked against all seven rules independently. Most are rejected, and each rejection is arithmetic you can check.',
+      'narrate': 'Prose written over the ledger. The narrator can only see numbers the kernel already computed.',
+      'number guard': 'Every figure in the finished sentence is read back against the ledger. An unbacked number blocks the answer.'
+    };
+
+    function renderDecisionNetwork(tr) {
+      if (!tr || !tr.stages || !tr.stages.length) return '';
+      var rows = tr.stages.map(function (s) {
+        var blocked = (s.verdict === 'block' || s.verdict === 'failed');
+        var opts = (s.options || []).map(function (o) {
+          return '<span class="dopt' + (o.chosen ? ' win' : '') + '">' + escapeHtml(o.label) +
+            (o.score !== undefined ? '<span class="sc">' + o.score + '</span>' : '') + '</span>';
+        }).join('');
+        var why = (s.options || []).filter(function (o) { return o.why; }).slice(0, 6).map(function (o) {
+          return (o.chosen ? '\u2713' : '\u2717') + ' <b>' + escapeHtml(o.label) + '</b> \u2014 ' + escapeHtml(o.why);
+        }).join('<br>');
+        var agree = (s.meta && s.meta.agreement)
+          ? '<div class="dwhy">' + escapeHtml(s.meta.agreement) + '</div>' : '';
+        return '<div class="dstage k-' + s.kind + (blocked ? ' blocked' : '') + '">' +
+          '<span class="dnode"></span>' +
+          '<span><span class="dname">' + escapeHtml(s.name) + '</span>' +
+          '<span class="dkind">' + s.kind + '</span></span>' +
+          '<span><span class="ddetail">' + escapeHtml(s.detail || DNET_BLURB[s.name] || '') + '</span>' +
+          (opts ? '<div class="dopts">' + opts + '</div>' : '') +
+          (why ? '<div class="dwhy">' + why + '</div>' : '') + agree + '</span>' +
+          '<span class="dms">' + s.ms + ' ms</span></div>';
+      }).join('');
+      var blockedAt = null;
+      tr.stages.forEach(function (s) { if (!blockedAt && s.verdict === 'block') blockedAt = s; });
+      return '<div class="dnet">' +
+        '<div class="dnet-head" onclick="this.parentNode.classList.toggle(\'open\')">' +
+        '<span class="caret">\u25B8</span> Decision network' +
+        '<span class="dnet-tallies">' +
+        '<span class="dnet-pill ok">' + tr.gates_passed + ' gates passed</span>' +
+        (tr.gates_blocked ? '<span class="dnet-pill no">blocked at ' + escapeHtml(blockedAt ? blockedAt.name : '') + '</span>' : '') +
+        (tr.options_rejected ? '<span class="dnet-pill">' + tr.options_rejected + ' rejected</span>' : '') +
+        '<span class="dnet-pill">' + tr.stages.length + ' stages</span>' +
+        '</span></div>' +
+        '<div class="dnet-body">' + rows +
+        '<div class="dnet-foot">Each stage is an independent decider. Gates stop the question dead; ' +
+        'choosers weigh rivals and record what lost. No model judges another model anywhere in this chain ' +
+        '\u2014 every language-model output is checked by deterministic code that never saw the prose.</div>' +
+        '</div></div>';
+    }
+
     function renderAdvisorTurn(cardElem, ans) {
         const resObj = (ans.result && typeof ans.result === 'object') ? ans.result : {};
         const isLegal = resObj.legal === true || (resObj.options && resObj.options.length > 0);
@@ -1704,6 +1810,7 @@ DGCA CAR Section 7 Legality:
             <div style="font-size:0.82rem; color:var(--ink-primary); line-height:1.5;">${formattedProse}</div>
             ${optionsHtml}
             ${excludedHtml}
+            ${renderDecisionNetwork(ans.trace)}
         `;
 
         // Update Evidence Ledger facts dynamically
