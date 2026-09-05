@@ -1027,77 +1027,7 @@ input, select { font: inherit; color: inherit; }
 }
 
 .toast-bar.show { transform: translateY(0); opacity: 1; }
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-8px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Threat Resolution Modal */
-.resolve-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
-    z-index: 9999; display: none; align-items: center; justify-content: center;
-    animation: fadeIn 0.3s ease;
-}
-.resolve-overlay.active { display: flex; }
-.resolve-panel {
-    background: var(--surface-card); border: 1px solid var(--border-subtle);
-    border-radius: 16px; width: 90vw; max-width: 820px; max-height: 85vh;
-    overflow-y: auto; padding: 0; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-.resolve-header {
-    padding: 20px 24px; border-bottom: 1px solid var(--border-subtle);
-    display: flex; align-items: center; justify-content: space-between;
-    position: sticky; top: 0; background: var(--surface-card); z-index: 1;
-    border-radius: 16px 16px 0 0;
-}
-.resolve-header h3 { margin: 0; color: var(--ink-primary); font-size: 1rem; display: flex; align-items: center; gap: 8px; }
-.resolve-close { background: none; border: none; color: var(--ink-muted); font-size: 1.2rem; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
-.resolve-close:hover { background: var(--border-subtle); color: var(--ink-primary); }
-.resolve-body { padding: 20px 24px; }
-.resolve-problem {
-    background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25);
-    border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
-    color: var(--ink-primary); font-size: 0.82rem; line-height: 1.5;
-}
-.resolve-problem strong { color: #ef4444; }
-.resolve-llm {
-    background: var(--brand-green-soft); border: 1px solid var(--brand-green);
-    border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
-    color: var(--ink-primary); font-size: 0.8rem; line-height: 1.6;
-}
-.resolve-llm-label { color: var(--brand-green-strong); font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
-.resolve-solutions-title { color: var(--ink-primary); font-size: 0.85rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-.solution-card {
-    background: var(--surface-base); border: 1px solid var(--border-subtle);
-    border-radius: 12px; padding: 16px; margin-bottom: 12px;
-    transition: all 0.2s ease; cursor: default;
-}
-.solution-card:hover { border-color: var(--brand-green); box-shadow: 0 2px 12px rgba(16, 185, 129, 0.1); }
-.solution-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.solution-rank { font-size: 0.65rem; font-weight: 700; color: #fff; background: var(--brand-green-strong); border-radius: 6px; padding: 2px 8px; }
-.solution-confidence { font-size: 0.7rem; font-weight: 600; font-family: var(--font-mono); }
-.confidence-high { color: #10b981; }
-.confidence-mid { color: #f59e0b; }
-.confidence-low { color: #ef4444; }
-.solution-action { color: var(--ink-primary); font-weight: 600; font-size: 0.82rem; margin-bottom: 6px; }
-.solution-reasoning { color: var(--ink-secondary); font-size: 0.75rem; line-height: 1.5; margin-bottom: 10px; }
-.solution-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-.solution-meta-tag { font-size: 0.65rem; padding: 2px 8px; border-radius: 6px; font-family: var(--font-mono); }
-.solution-cost { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
-.solution-legal { background: var(--brand-green-soft); color: var(--brand-green-strong); border: 1px solid var(--brand-green); }
-.solution-rules { background: rgba(99, 102, 241, 0.1); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); }
-.solution-apply-btn {
-    background: var(--brand-green-strong); color: #fff; border: none;
-    padding: 8px 20px; border-radius: 8px; font-weight: 600; font-size: 0.78rem;
-    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
-}
-.solution-apply-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
-.resolve-loading {
-    text-align: center; padding: 40px; color: var(--ink-muted);
-}
-.resolve-loading i { font-size: 2rem; color: var(--brand-green-strong); margin-bottom: 12px; display: block; }
-
+    
 /* ---- decision network: where the advisor could have gone another way ---- */
 .dnet{margin-top:14px;border:1px solid #dde3ea;border-radius:6px;overflow:hidden;background:rgba(127,127,127,.03)}
 .dnet-head{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;user-select:none;
@@ -1141,6 +1071,76 @@ input, select { font: inherit; color: inherit; }
   .dnet-pill.no{background:rgba(224,133,133,.16);color:#e08585}
   .dopt.win{background:rgba(111,195,162,.16);border-color:rgba(111,195,162,.4);color:#6fc3a2}
 }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Threat Resolution Modal */
+.resolve-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+    z-index: 9999; display: none; align-items: center; justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+.resolve-overlay.active { display: flex; }
+.resolve-panel {
+    background: var(--surface-2); border: 1px solid var(--hairline);
+    border-radius: 16px; width: 90vw; max-width: 820px; max-height: 85vh;
+    overflow-y: auto; padding: 0; box-shadow: var(--shadow-pop);
+}
+.resolve-header {
+    padding: 20px 24px; border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surface-2); z-index: 1;
+    border-radius: 16px 16px 0 0;
+}
+.resolve-header h3 { margin: 0; color: var(--ink-primary); font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+.resolve-close { background: none; border: none; color: var(--ink-muted); font-size: 1.2rem; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
+.resolve-close:hover { background: var(--surface-3); color: var(--ink-primary); }
+.resolve-body { padding: 20px 24px; }
+.resolve-problem {
+    background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+    color: var(--ink-primary); font-size: 0.82rem; line-height: 1.5;
+}
+.resolve-problem strong { color: #ef4444; }
+.resolve-llm {
+    background: var(--brand-green-soft); border: 1px solid var(--brand-green);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+    color: var(--ink-primary); font-size: 0.8rem; line-height: 1.6;
+}
+.resolve-llm-label { color: var(--brand-green-strong); font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.resolve-solutions-title { color: var(--ink-primary); font-size: 0.85rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.solution-card {
+    background: var(--surface-3); border: 1px solid var(--hairline);
+    border-radius: 12px; padding: 16px; margin-bottom: 12px;
+    transition: all 0.2s ease; cursor: default;
+}
+.solution-card:hover { border-color: var(--brand-green); box-shadow: 0 2px 12px rgba(16, 185, 129, 0.1); }
+.solution-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.solution-rank { font-size: 0.65rem; font-weight: 700; color: #fff; background: var(--brand-green-strong); border-radius: 6px; padding: 2px 8px; }
+.solution-confidence { font-size: 0.7rem; font-weight: 600; font-family: var(--font-mono); }
+.confidence-high { color: #10b981; }
+.confidence-mid { color: #f59e0b; }
+.confidence-low { color: #ef4444; }
+.solution-action { color: var(--ink-primary); font-weight: 600; font-size: 0.82rem; margin-bottom: 6px; }
+.solution-reasoning { color: var(--ink-secondary); font-size: 0.75rem; line-height: 1.5; margin-bottom: 10px; }
+.solution-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.solution-meta-tag { font-size: 0.65rem; padding: 2px 8px; border-radius: 6px; font-family: var(--font-mono); }
+.solution-cost { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.solution-legal { background: var(--brand-green-soft); color: var(--brand-green-strong); border: 1px solid var(--brand-green); }
+.solution-rules { background: rgba(99, 102, 241, 0.1); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); }
+.solution-apply-btn {
+    background: var(--brand-green-strong); color: #fff; border: none;
+    padding: 8px 20px; border-radius: 8px; font-weight: 600; font-size: 0.78rem;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+}
+.solution-apply-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+.resolve-loading {
+    text-align: center; padding: 40px; color: var(--ink-muted);
+}
+.resolve-loading i { font-size: 2rem; color: var(--brand-green-strong); margin-bottom: 12px; display: block; }
 </style>
 </head>
 <body>
@@ -1184,10 +1184,13 @@ input, select { font: inherit; color: inherit; }
                     <span class="kbd-badge">⌘K</span>
                 </div>
                 <!-- Region Selector -->
-                <div class="region-selector" style="margin-right: 15px; display: flex; align-items: center;">
-                    <select id="regionSelect" onchange="changeRegion(this.value)" style="background: var(--surface-low); border: 1px solid var(--border-light); color: var(--ink-primary); border-radius: 6px; padding: 6px 12px; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-                        <option value="in">🇮🇳 India</option>
-                        <option value="eu">🇪🇺 Europe</option>
+                <div style="display:flex; align-items:center; gap:6px; background:var(--surface-2); padding:4px 10px; border-radius:12px; border:1px solid var(--hairline);">
+                    <span id="regionFlag">🇮🇳</span>
+                    <select id="regionSelect" style="background:transparent; border:none; color:var(--ink-primary); font-size:0.75rem; font-weight:600; cursor:pointer; outline:none;" onchange="changeRegion(this.value)">
+                        <option value="IN">India (DGCA)</option>
+                        <option value="US">USA (FAA)</option>
+                        <option value="EU">Europe (EASA)</option>
+                        <option value="AE">UAE (GCAA)</option>
                     </select>
                 </div>
                 
@@ -1201,9 +1204,9 @@ input, select { font: inherit; color: inherit; }
                     <i class="fa-solid fa-bell"></i>
                 </button>
 
-                <!-- Admin Profile -->
+                <!-- Duty Chief Profile -->
                 <div class="user-profile-widget" onclick="switchOCCView('audit')">
-                    <div class="user-avatar-circle"><i class="fa-solid fa-user-shield" style="font-size:0.7rem;"></i></div>
+                    <div class="user-avatar-circle" style="background:var(--brand-green-soft); color:var(--brand-green-strong);"><i class="fa-solid fa-shield-halved"></i></div>
                     <span style="font-size:0.8rem; font-weight:600; color:var(--ink-primary);">Admin ⌵</span>
                 </div>
             </div>
@@ -1232,13 +1235,6 @@ input, select { font: inherit; color: inherit; }
                 <div class="kpi-texts">
                     <span class="kpi-title">Standby Reserves</span>
                     <span class="kpi-val" id="statReserves">16</span>
-                </div>
-            </div>
-            <div class="kpi-unit">
-                <div class="kpi-icon-box" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;"><i class="fa-solid fa-satellite-dish fa-beat-fade"></i></div>
-                <div class="kpi-texts">
-                    <span class="kpi-title">Data Stream</span>
-                    <span class="kpi-val" style="color: #ef4444; font-size: 1.1rem;" id="streamStatus">CONNECTING</span>
                 </div>
             </div>
             <div class="kpi-unit">
@@ -1305,9 +1301,29 @@ input, select { font: inherit; color: inherit; }
                         <span style="font-size:0.68rem; color:var(--brand-green-strong); font-family:var(--font-mono);">Live Stream</span>
                     </div>
                     <div id="threatFeedBody" style="overflow-y:auto; flex:1;">
-                        <div style="padding:16px; text-align:center; color:var(--ink-muted); font-size:0.75rem;">
-                            <i class="fa-solid fa-satellite-dish fa-beat-fade" style="font-size:1.2rem; color:var(--brand-orange); margin-bottom:8px; display:block;"></i>
-                            Waiting for live events...
+                        <div class="threat-event-item">
+                            <div class="threat-badge-row">
+                                <span class="threat-pill red">Critical · S1</span>
+                                <span style="font-size:0.65rem; color:var(--ink-muted);">15 Sep 05:00Z</span>
+                            </div>
+                            <strong style="color:var(--ink-primary); margin-top:2px;">Capt. C-1042 Sick Call</strong>
+                            <span style="color:var(--ink-secondary); font-size:0.7rem;">Uncrewed legs on P-2291 (AI-801/802/803). 486 pax at risk.</span>
+                        </div>
+                        <div class="threat-event-item">
+                            <div class="threat-badge-row">
+                                <span class="threat-pill amber">Warning · Pre-emptive</span>
+                                <span style="font-size:0.65rem; color:var(--ink-muted);">15 Sep 04:30Z</span>
+                            </div>
+                            <strong style="color:var(--ink-primary); margin-top:2px;">FO C-2087 Approaching 60h Cap</strong>
+                            <span style="color:var(--ink-secondary); font-size:0.7rem;">Current 7D duty 51.5h. Additional duty would breach CAR limit.</span>
+                        </div>
+                        <div class="threat-event-item">
+                            <div class="threat-badge-row">
+                                <span class="threat-pill red">Critical · S4</span>
+                                <span style="font-size:0.65rem; color:var(--ink-muted);">17 Sep 08:00Z</span>
+                            </div>
+                            <strong style="color:var(--ink-primary); margin-top:2px;">BLR Hub Closure Notice</strong>
+                            <span style="color:var(--ink-secondary); font-size:0.7rem;">Fuel farm outage. 6 sectors affected. Cascading FDP risk.</span>
                         </div>
                     </div>
                 </div>
@@ -1608,105 +1624,6 @@ DGCA CAR Section 7 Legality:
         initLiveStream();
     });
 
-    // Live Stream via SSE
-    function initLiveStream() {
-        const eventSource = new EventSource("/api/stream");
-        const statusEl = document.getElementById("streamStatus");
-        
-        eventSource.onopen = () => {
-            statusEl.textContent = "LIVE";
-            statusEl.style.color = "#10b981"; // green
-            statusEl.previousElementSibling.style.color = "#10b981";
-            statusEl.previousElementSibling.style.background = "rgba(16, 185, 129, 0.15)";
-        };
-
-        eventSource.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.scenario && data.dynamic_event) {
-                    showToast(`📡 Live Event: ${data.title}`);
-                    // Push to threat feed panel only — do NOT inject into chat
-                    appendThreatFeedEvent(data);
-                    // Push the event into the solver state silently
-                    fetch('/api/whatif', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({scenario: data.scenario, dynamic_event: data.dynamic_event, session: STATE.session})
-                    }).catch(() => {});
-                }
-            } catch (e) {
-                console.error("Error parsing live stream data", e);
-            }
-        };
-
-        eventSource.onerror = () => {
-            statusEl.textContent = "DISCONNECTED";
-            statusEl.style.color = "#ef4444"; // red
-            statusEl.previousElementSibling.style.color = "#ef4444";
-            statusEl.previousElementSibling.style.background = "rgba(239, 68, 68, 0.15)";
-        };
-    }
-
-    // Append a live event card to the Threat Stream panel (left sidebar)
-    function appendThreatFeedEvent(data) {
-        const feed = document.getElementById('threatFeedBody');
-        // Remove the "Waiting..." placeholder if it's the first event
-        if (feed.querySelector('[data-placeholder]') || feed.children.length === 1 && feed.children[0].textContent.includes('Waiting')) {
-            feed.innerHTML = '';
-        }
-
-        const ev = data.dynamic_event || {};
-        const now = new Date();
-        const ts = now.toUTCString().split(' ').slice(1, 4).join(' ') + ' ' + now.toISOString().split('T')[1].substring(0, 5) + 'Z';
-
-        let pillClass = 'amber';
-        let pillLabel = 'Warning';
-        let title = data.title || 'Unknown Event';
-        let desc = '';
-
-        if (ev.type === 'SICK_CREW') {
-            pillClass = 'red';
-            pillLabel = 'Critical · Sick';
-            title = `${ev.crew_id} Sick Call`;
-            desc = `Crew member ${ev.crew_id} reported sick${ev.pairing_id ? '. Pairing ' + ev.pairing_id + ' affected.' : '.'}`;
-        } else if (ev.type === 'DELAY') {
-            pillClass = 'amber';
-            pillLabel = `Warning · ${ev.delay_hours}h Delay`;
-            title = `${ev.aircraft} Delayed ${ev.delay_hours}h`;
-            desc = `Aircraft ${ev.aircraft} delayed by ${ev.delay_hours}h on ${ev.date}. FDP assessment required.`;
-        } else if (ev.type === 'STATION_CLOSURE') {
-            pillClass = 'red';
-            pillLabel = 'Critical · Closure';
-            title = `${ev.station} Station Closure`;
-            desc = `${ev.station} closed from ${ev.start_utc} to ${ev.end_utc}. Departures and arrivals suspended.`;
-        }
-
-        const item = document.createElement('div');
-        item.className = 'threat-event-item';
-        item.style.animation = 'fadeIn 0.4s ease';
-        item.style.cursor = 'pointer';
-        item.onclick = function() {
-            openResolveModal(data, this);
-        };
-        item.innerHTML = `
-            <div class="threat-badge-row">
-                <span class="threat-pill ${pillClass}">${pillLabel}</span>
-                <span style="font-size:0.65rem; color:var(--ink-muted);">${ts}</span>
-            </div>
-            <strong style="color:var(--ink-primary); margin-top:2px;">${escapeHtml(title)}</strong>
-            <span style="color:var(--ink-secondary); font-size:0.7rem;">${escapeHtml(desc)}</span>
-            <span style="font-size:0.6rem; color:var(--brand-green-strong); margin-top:4px; cursor:pointer;">⬆ Click to ask advisor about this event</span>
-        `;
-
-        // Prepend (newest first)
-        feed.insertBefore(item, feed.firstChild);
-
-        // Keep max 20 events
-        while (feed.children.length > 20) {
-            feed.removeChild(feed.lastChild);
-        }
-    }
-
     // 1. Theme Engine (frontend-next Light/Dark Theme)
     function initTheme() {
         const saved = localStorage.getItem('occ-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'dark');
@@ -1729,6 +1646,88 @@ DGCA CAR Section 7 Legality:
         const isDark = document.documentElement.classList.contains('dark');
         applyTheme(isDark ? 'light' : 'dark');
         showToast(`Theme switched to ${isDark ? 'Light (Observatory Green)' : 'Dark (Obsidian Forest)'}`);
+    }
+
+    function initLiveStream() {
+        if (window._evtSource) return;
+        window._evtSource = new EventSource('/api/stream');
+        
+        // Clear the default hardcoded events on first connect
+        const feed = document.getElementById('threatFeedBody');
+        if (feed) feed.innerHTML = '<div style="padding:16px; text-align:center; color:var(--ink-muted); font-size:0.75rem;">Waiting for live events...</div>';
+        
+        window._evtSource.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data && data.dynamic_event) {
+                appendThreatFeedEvent(data);
+            }
+        };
+        window._evtSource.onerror = () => {
+            console.error('SSE Error, reconnecting...');
+            window._evtSource.close();
+            window._evtSource = null;
+            setTimeout(initLiveStream, 5000);
+        };
+    }
+
+    function appendThreatFeedEvent(data) {
+        const feed = document.getElementById('threatFeedBody');
+        if (!feed) return;
+        
+        // Remove empty state message if it exists
+        if (feed.innerHTML.includes('Waiting for live events...')) {
+            feed.innerHTML = '';
+        }
+
+        const ev = data.dynamic_event;
+        const now = new Date();
+        const dStr = now.getUTCDate().toString().padStart(2, '0') + ' ' + 
+                     now.toLocaleString('default', { month: 'short' }) + ' ' +
+                     now.getUTCHours().toString().padStart(2, '0') + ':' + 
+                     now.getUTCMinutes().toString().padStart(2, '0') + 'Z';
+
+        let pillClass = 'amber';
+        let pillText = 'Warning';
+        let title = data.title || 'Dynamic Alert';
+        let desc = 'Operational event detected.';
+        
+        if (ev.type === 'SICK_CREW') {
+            pillClass = 'red'; pillText = 'Critical';
+            title = `Sick Call: ${ev.crew_id}`;
+            desc = `Crew ${ev.crew_id} reported sick. Roster ${ev.pairing_id || 'Unknown'} requires coverage.`;
+        } else if (ev.type === 'DELAY') {
+            pillClass = ev.delay_hours >= 3 ? 'red' : 'amber';
+            pillText = ev.delay_hours >= 3 ? 'Critical' : 'Warning';
+            title = `Delay: ${ev.aircraft}`;
+            desc = `${ev.aircraft} delayed by ${ev.delay_hours} hours on ${ev.date}. Checking FDP constraints.`;
+        } else if (ev.type === 'STATION_CLOSURE') {
+            pillClass = 'red'; pillText = 'Critical';
+            title = `Station Closed: ${ev.station}`;
+            desc = `${ev.station} closed from ${ev.start_utc} to ${ev.end_utc}. Departures and arrivals suspended.`;
+        }
+
+        const item = document.createElement('div');
+        item.className = 'threat-event-item';
+        item.style.animation = 'fadeIn 0.4s ease';
+        item.style.cursor = 'pointer';
+        item.onclick = function() {
+            openResolveModal(data, this);
+        };
+        
+        item.innerHTML = `
+            <div class="threat-badge-row">
+                <span class="threat-pill ${pillClass}">${pillText}</span>
+                <span style="font-size:0.65rem; color:var(--ink-muted);">${dStr}</span>
+            </div>
+            <strong style="color:var(--ink-primary); margin-top:2px; display:block;">${escapeHtml(title)}</strong>
+            <span style="color:var(--ink-secondary); font-size:0.7rem; display:block;">${escapeHtml(desc)}</span>
+            <span style="font-size:0.6rem; color:var(--brand-green-strong); margin-top:4px; cursor:pointer; display:block;">⬆ Click to ask advisor about this event</span>
+        `;
+        
+        feed.insertBefore(item, feed.firstChild);
+        while (feed.children.length > 20) {
+            feed.removeChild(feed.lastChild);
+        }
     }
 
     // 2. View Switching
@@ -2117,23 +2116,14 @@ CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
     }
 
     // 7. Scenario Triggers
-    async function triggerScenario(id, dynamicEvent = null) {
+    async function triggerScenario(id) {
         switchOCCView('console');
         try {
             await fetch('/api/whatif', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({scenario: id, dynamic_event: dynamicEvent, session: STATE.session})
+                body: JSON.stringify({scenario: id, session: STATE.session})
             });
-
-            if (dynamicEvent) {
-                let prompt = `Analyze this live disruption: ${dynamicEvent.type}`;
-                if (dynamicEvent.type === 'SICK_CREW') prompt = `Captain ${dynamicEvent.crew_id} called in sick. What are the recovery options?`;
-                if (dynamicEvent.type === 'DELAY') prompt = `${dynamicEvent.aircraft} is delayed ${dynamicEvent.delay_hours}h on ${dynamicEvent.date}. Does this breach FDP?`;
-                if (dynamicEvent.type === 'STATION_CLOSURE') prompt = `${dynamicEvent.station} is closed. How does this affect flights?`;
-                await submitCustomPrompt(prompt);
-                return;
-            }
 
             const prompts = {
                 'S1': 'Captain C-1042 just called in sick for tomorrow - which flights are now uncrewed?',
@@ -2287,25 +2277,7 @@ CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
         if (!s) return '';
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
-    
-    async function changeRegion(regionCode) {
-        try {
-            const res = await fetch("/api/set_region", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ region: regionCode })
-            });
-            if (res.ok) {
-                window.location.reload();
-            } else {
-                console.error("Failed to set region");
-            }
-        } catch (e) {
-            console.error("Error setting region", e);
-        }
-    }
     </script>
-
     <!-- Threat Resolution Modal -->
     <div class="resolve-overlay" id="resolveOverlay">
         <div class="resolve-panel">
@@ -2400,7 +2372,7 @@ CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
                             <i class="fa-solid fa-chart-simple"></i> ${conf}% confidence
                         </span>
                     </div>
-                    <div style="height:3px; background:var(--border-subtle); border-radius:2px; margin-bottom:10px; overflow:hidden;">
+                    <div style="height:3px; background:var(--hairline); border-radius:2px; margin-bottom:10px; overflow:hidden;">
                         <div style="height:100%; width:${confBar}%; background:${conf >= 80 ? '#10b981' : conf >= 60 ? '#f59e0b' : '#ef4444'}; border-radius:2px; transition: width 0.6s ease;"></div>
                     </div>
                     <div class="solution-action"><i class="fa-solid fa-check-circle" style="color:var(--brand-green-strong)"></i> ${escapeHtml(sol.action)}</div>
@@ -2411,7 +2383,7 @@ CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
                         <span class="solution-meta-tag solution-cost"><i class="fa-solid fa-indian-rupee-sign"></i> ${costStr}</span>
                         <span class="solution-meta-tag solution-legal"><i class="fa-solid fa-shield-check"></i> ${sol.legal ? 'Legal' : 'Breach'}</span>
                         <span class="solution-meta-tag solution-rules"><i class="fa-solid fa-book"></i> ${rulesStr}</span>
-                        ${sol.coverage ? `<span class="solution-meta-tag" style="background:rgba(99,102,241,0.08); color:var(--ink-secondary); border:1px solid var(--border-subtle);"><i class="fa-solid fa-plane"></i> ${escapeHtml(sol.coverage)}</span>` : ''}
+                        ${sol.coverage ? `<span class="solution-meta-tag" style="background:rgba(99,102,241,0.08); color:var(--ink-secondary); border:1px solid var(--hairline);"><i class="fa-solid fa-plane"></i> ${escapeHtml(sol.coverage)}</span>` : ''}
                     </div>
                     <button class="solution-apply-btn" onclick="applyFix(${idx}, '${escapeHtml(sol.action)}')">
                         <i class="fa-solid fa-wrench"></i> Apply This Fix
@@ -2474,6 +2446,28 @@ CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
     document.getElementById('resolveOverlay').addEventListener('click', function(e) {
         if (e.target === this) closeResolveModal();
     });
+    async function changeRegion(val) {
+        const flags = { 'IN': '🇮🇳', 'US': '🇺🇸', 'EU': '🇪🇺', 'AE': '🇦🇪' };
+        document.getElementById('regionFlag').textContent = flags[val];
+        
+        try {
+            let res = await fetch('/api/set_region', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ region: val })
+            });
+            if (res.ok) {
+                showToast(`✅ Region rules updated to ${val}`);
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                console.error("Failed to set region");
+                showToast(`❌ Failed to update region rules`);
+            }
+        } catch (e) {
+            console.error("Error setting region", e);
+            showToast(`❌ Error updating region rules`);
+        }
+    }
     </script>
 </body>
 </html>
