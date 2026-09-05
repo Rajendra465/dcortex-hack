@@ -862,6 +862,21 @@ def summarise(tool: str, p: Any) -> str:
     if tool == "find_flights":
         if "answer" in p:
             return f"{p['answer']}"
+        if not p["count"]:
+            # "0 flight(s):" is a true answer that reads like a broken one. A
+            # controller cannot tell whether nothing matched or the filter was
+            # wrong, so an empty result says what it looked for. Asking for DEL
+            # departures on an afternoon that has none should read as an
+            # answer, not a shrug.
+            said = [f"{k.replace('_', ' ')} {v}" for k, v in (
+                ("departing", p.get("dep_station")),
+                ("arriving", p.get("arr_station")),
+                ("on", p.get("date")),
+                ("after", p.get("dep_after_utc")),
+                ("before", p.get("dep_before_utc")),
+            ) if v]
+            return ("No flights " + ", ".join(said) + "." if said
+                    else "No flights match that.")
         return f"{p['count']} flight(s): " + ", ".join(p["flights"][:12])
     if tool == "find_crew":
         return (f"{p['count']} crew: "

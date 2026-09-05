@@ -134,9 +134,10 @@ def test_station_closure_with_times_in_the_question(adv):
     """
     d, refused = answer(
         adv, "Station BLR is closed 14:00-20:00 - what's the crew impact?")
-    if refused:
-        pytest.xfail("times are in the question but are not bound from it")
-    assert "BLR" in str(d.get("result") or "")
+    assert not refused, "the window is in the sentence; asking for it is wrong"
+    blob = str(d.get("result") or "") + (d.get("explanation") or "")
+    assert "BLR" in blob
+    assert "14:00" in blob and "20:00" in blob, "the window must be echoed back"
 
 
 # --------------------------------------------------------------- Tier 3

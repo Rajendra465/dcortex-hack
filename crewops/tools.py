@@ -121,6 +121,13 @@ def find_flights(snap: Snapshot, **kw: Any) -> Result:
                                                 if f.block_hours == mx})}
     elif agg == "distinct_arr":
         payload["answer"] = sorted({f.arr_station for f in rows})
+    # Echo the filters that were applied. An empty result is only useful if it
+    # can say what it looked for -- "0 flight(s):" leaves a controller unable
+    # to tell an empty afternoon from a broken query.
+    for k in ("date", "dep_station", "arr_station", "flight_no",
+              "dep_after_utc", "dep_before_utc"):
+        if kw.get(k):
+            payload[k] = kw[k]
     return payload, led
 
 
