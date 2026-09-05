@@ -74,6 +74,15 @@ ul{margin:0 0 16px;padding-left:20px;max-width:70ch}li{margin-bottom:8px}
 .foot{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.75}
 @media (max-width:640px){.row{grid-template-columns:1fr;gap:5px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* the network diagram */
+.net{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 18px;margin:22px 0;overflow-x:auto}
+.net svg{display:block;min-width:640px;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px}
+.lg{display:flex;align-items:center;gap:7px;font-size:13px;padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.lg .dot{width:9px;height:9px;border-radius:50%}
+.lg b{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.lg span.d{color:var(--dim);font-size:12.5px}
 </style>
 
 </head>
@@ -205,7 +214,63 @@ ul{margin:0 0 16px;padding-left:20px;max-width:70ch}li{margin-bottom:8px}
 </section>
 
 <section class="slide">
-  <div class="num"><b>09</b> &nbsp;HOW IT DECIDES</div>
+  <div class="num"><b>09</b> &nbsp;THE AGENT NETWORK</div>
+  <h2>Twelve small deciders, and not one of them is a chatbot</h2>
+  <p>"Agent" here does not mean a model in a loop. It means an independent decider with one job, one input, one verdict, and the authority to stop the request. Twelve run on every question. Six can refuse outright.</p>
+
+  <div class="legend">
+    <span class="lg"><span class="dot" style="background:var(--ok)"></span><span><b>gate</b> <span class="d">can stop the request dead</span></span></span>
+    <span class="lg"><span class="dot" style="background:var(--accent)"></span><span><b>derive</b> <span class="d">extracts or computes</span></span></span>
+    <span class="lg"><span class="dot" style="background:var(--warn)"></span><span><b>choose</b> <span class="d">weighs rivals, records the losers</span></span></span>
+    <span class="lg"><span class="dot" style="background:#B394D0"></span><span><b>speak</b> <span class="d">writes prose, and is audited after</span></span></span>
+  </div>
+
+  <div class="net">
+    <svg viewBox="0 0 760 430" role="img" aria-label="Twelve deciders in sequence, six of which can refuse">
+      <defs><marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#E2686A"/></marker></defs>
+      <text x="60" y="17" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#75828D" letter-spacing="1.4">QUESTION IN</text>
+      <line x1="60" y1="25" x2="752" y2="25" stroke="#242D36"/>
+      <line x1="82" y1="41" x2="82" y2="351" stroke="#242D36" stroke-width="1.5"/>
+      <g font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#E9EEF2">
+        <g><circle cx="82" cy="49" r="5.5" fill="#3FB27F"/><text x="100" y="53" font-weight="600">Scope screen</text><text x="248" y="53" fill="#AFBAC4">Crew Control work, on data we hold?</text></g>
+        <g><circle cx="82" cy="77" r="5.5" fill="#3FB27F"/><text x="100" y="81" font-weight="600">Roster window</text><text x="248" y="81" fill="#AFBAC4">dates inside the published week?</text></g>
+        <g><circle cx="82" cy="105" r="5.5" fill="#3FB27F"/><text x="100" y="109" font-weight="600">Crew on strength</text><text x="248" y="109" fill="#AFBAC4">this crew number is on the roster?</text></g>
+        <g><circle cx="82" cy="133" r="5.5" fill="#5B9BD5"/><text x="100" y="137" font-weight="600">Request reader</text><text x="248" y="137" fill="#AFBAC4">crew, trips, sectors, dates</text></g>
+        <g><circle cx="82" cy="161" r="5.5" fill="#D9A03C"/><text x="100" y="165" font-weight="600">Classifier</text><text x="248" y="165" fill="#AFBAC4">14 capabilities scored; losers recorded</text></g>
+        <g><circle cx="82" cy="189" r="5.5" fill="#D9A03C"/><text x="100" y="193" font-weight="600">Query builder</text><text x="248" y="193" fill="#AFBAC4">two planners race; validator arbitrates</text></g>
+        <g><circle cx="82" cy="217" r="5.5" fill="#3FB27F"/><text x="100" y="221" font-weight="600">Date re-check</text><text x="248" y="221" fill="#AFBAC4">now against the chosen tool horizon</text></g>
+        <g><circle cx="82" cy="245" r="5.5" fill="#3FB27F"/><text x="100" y="249" font-weight="600">Query validator</text><text x="248" y="249" fill="#AFBAC4">every field bound before a figure is read</text></g>
+        <g><circle cx="82" cy="273" r="5.5" fill="#5B9BD5"/><text x="100" y="277" font-weight="600">Legality engine</text><text x="248" y="277" fill="#AFBAC4">7 rules &#8212; every number is born here</text></g>
+        <g><circle cx="82" cy="301" r="5.5" fill="#D9A03C"/><text x="100" y="305" font-weight="600">Crew screening</text><text x="248" y="305" fill="#AFBAC4">28 candidates &#215; 7 rules, independently</text></g>
+        <g><circle cx="82" cy="329" r="5.5" fill="#B394D0"/><text x="100" y="333" font-weight="600">Answer writer</text><text x="248" y="333" fill="#AFBAC4">writes only from computed figures</text></g>
+        <g><circle cx="82" cy="357" r="5.5" fill="#3FB27F"/><text x="100" y="361" font-weight="600">Figure audit</text><text x="248" y="361" fill="#AFBAC4">every number traced back to source</text></g>
+      </g>
+      <g stroke="#E2686A" stroke-width="1.2" stroke-dasharray="3 3" fill="none" marker-end="url(#r)">
+        <path d="M82,49 q -30,0 -30,20"/><path d="M82,77 q -30,0 -30,20"/>
+        <path d="M82,105 q -30,0 -30,20"/><path d="M82,217 q -30,0 -30,20"/>
+        <path d="M82,245 q -30,0 -30,20"/><path d="M82,357 q -30,0 -30,20"/>
+      </g>
+      <text x="4" y="404" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#E2686A" letter-spacing="1.2">6 CAN REFUSE</text>
+      <line x1="60" y1="381" x2="752" y2="381" stroke="#242D36"/>
+      <text x="648" y="404" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#75828D" letter-spacing="1.4">ANSWER OUT</text>
+    </svg>
+  </div>
+
+  <h3>The only place two agents disagree</h3>
+  <p>Two planners can answer any question &mdash; a deterministic intent index and the language model. Both run. Where they differ, the <strong>validator</strong> arbitrates, and the disagreement is shown rather than resolved silently. It works as a council for one reason: the arbiter is deterministic. The index is not judging the model's prose; it is proposing a rival typed plan that the same validator has to accept.</p>
+
+  <div class="note bad">
+    <h4>What this network deliberately does not contain</h4>
+    <p><strong>No model judges another model. Anywhere.</strong> Intrinsic self-correction &mdash; a model revising its own answer with no external ground truth &mdash; measurably <em>degrades</em> reasoning, and the earlier results claiming otherwise used oracle labels to decide when to stop.</p>
+    <p>So every model output here is checked by code that never saw the prose: a typed validator, a kernel that recomputes, and an audit that reads the finished sentence back against the ledger. A panel of models debating each other would look more sophisticated and be measurably worse.</p>
+  </div>
+
+  <p>Collapsed, the whole network is one line on the answer card: <span class="m">12 checks ran &middot; 6 passed &middot; 22 ruled out</span>. Opened, each agent shows what it screened for, what it found, the figures it decided from, and its own timing &mdash; typically <strong>under 0.05 ms</strong> of recording across all twelve, which is why explainability here is not a mode you switch on.</p>
+</section>
+
+<section class="slide">
+  <div class="num"><b>10</b> &nbsp;HOW IT DECIDES</div>
   <h2>Twelve checks, six of which can stop the question dead</h2>
   <div class="tw"><table>
     <thead><tr><th>Check</th><th>Screens for</th><th>On failure</th></tr></thead>
@@ -225,7 +290,7 @@ ul{margin:0 0 16px;padding-left:20px;max-width:70ch}li{margin-bottom:8px}
 </section>
 
 <section class="slide">
-  <div class="num"><b>10</b> &nbsp;WHAT WE FOUND IN OUR OWN WORK</div>
+  <div class="num"><b>11</b> &nbsp;WHAT WE FOUND IN OUR OWN WORK</div>
   <h2>42 of 42 &mdash; and three of the brief's own questions came back wrong</h2>
   <p>The brief says submissions may be run against held-out scenarios. So we ran the eight example questions printed in the brief, verbatim, through the natural-language layer. None is in the shipped question set. We scored 42/42 on the shipped set and <strong>3 of these 8 were confidently wrong</strong>.</p>
   <div class="tw"><table>
@@ -241,7 +306,7 @@ ul{margin:0 0 16px;padding-left:20px;max-width:70ch}li{margin-bottom:8px}
 </section>
 
 <section class="slide">
-  <div class="num"><b>11</b> &nbsp;HONEST LIMITS</div>
+  <div class="num"><b>12</b> &nbsp;HONEST LIMITS</div>
   <h2>Where it stops, and what it says when it gets there</h2>
   <ul>
     <li><strong>One week only.</strong> The roster ends 2026-09-20. Rest before a trip on the 21st is unverifiable, so we say "legal within the week we can see" rather than claim a certainty we do not have.</li>
@@ -257,7 +322,7 @@ ul{margin:0 0 16px;padding-left:20px;max-width:70ch}li{margin-bottom:8px}
 </section>
 
 <section class="slide">
-  <div class="num"><b>12</b> &nbsp;CLOSE</div>
+  <div class="num"><b>13</b> &nbsp;CLOSE</div>
   <h2>Fast because it is code. Right because it is checked. Trusted because it says when it is not sure.</h2>
   <div class="stats">
     <div class="stat ok"><div class="big">0</div><div class="lbl">wrong answers against the shipped keys</div></div>

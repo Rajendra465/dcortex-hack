@@ -2465,8 +2465,15 @@ input, select { font: inherit; color: inherit; }
 .btn-min{background:none;border:1px solid var(--hairline);color:var(--ink-secondary);
   border-radius:5px;cursor:pointer;font-size:.68rem;padding:2px 10px;font-family:inherit}
 .btn-min:hover{border-color:var(--brand-green);color:var(--ink-primary)}
-.prechat.min .live-bar,.prechat.min .flow-bar,
-.prechat.min .starter-wrap,.prechat.min .chat-query-builder{display:none !important}
+/* Scoped to chatPromptWrap, the common parent. The first version hung the
+   rule off #prechat -- but the Disruption Filter and the Try chips are its
+   SIBLINGS, not its children, so two of the five blocks ignored it and the
+   page still looked full. That is what "minimise is not working" was. */
+.chat-prompt-wrap.min #prechat .live-bar,
+.chat-prompt-wrap.min #prechat .flow-bar,
+.chat-prompt-wrap.min #prechat .starter-wrap,
+.chat-prompt-wrap.min #chatQueryBuilder,
+.chat-prompt-wrap.min #suggestionChipsRow{display:none !important}
 .starter-wrap{padding:10px 14px 0;display:flex;flex-direction:column;gap:7px}
 .starter-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .starter-tier{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.11em;
@@ -3957,7 +3964,9 @@ ACK REQD VIA ACARS CPDLC OR FREQ 131.850 MHZ</div>
     // the lot, and the choice survives a reload -- unfolding it on every visit
     // is the same annoyance with extra steps.
     function togglePrechat(){
-      const el = document.getElementById('prechat');
+      // Toggle on the wrapper that actually contains all five blocks.
+      const el = document.getElementById('chatPromptWrap') ||
+                 document.getElementById('prechat');
       const min = el.classList.toggle('min');
       document.getElementById('prechatBtn').textContent = min ? 'Show' : 'Minimise';
       const c = document.getElementById('prechatCount');
@@ -3966,21 +3975,24 @@ ACK REQD VIA ACARS CPDLC OR FREQ 131.850 MHZ</div>
     }
 
     function prechatSummary(){
-      const scn = document.querySelectorAll('#scenarioBar .flow-scn').length;
-      const q   = document.querySelectorAll('#starterQuestions .starter-chip').length;
-      const live= document.querySelectorAll('#liveItems .live-item').length;
+      const n = sel => document.querySelectorAll(sel).length;
       const bits = [];
-      if(scn)  bits.push(scn + ' disruptions');
-      if(q)    bits.push(q + ' examples');
-      if(live) bits.push(live + ' live');
-      return bits.join(' · ');
+      const scn = n('#scenarioBar .flow-scn'), q = n('#starterQuestions .starter-chip');
+      const live = n('#liveItems .live-item'), tries = n('#suggestionChipsRow .chip-suggestion');
+      if(scn)   bits.push(scn + ' disruptions');
+      if(q + tries) bits.push((q + tries) + ' examples');
+      if(live)  bits.push(live + ' live');
+      const f = document.getElementById('chatQueryBuilder');
+      if(f && f.style.display !== 'none') bits.push('filter');
+      return bits.join(' · ') || 'nothing to show';
     }
 
     function restorePrechat(){
       let min = false;
       try{ min = localStorage.getItem('occ.prechat') === 'min'; }catch(e){}
       if(min){
-        const el = document.getElementById('prechat');
+        const el = document.getElementById('chatPromptWrap') ||
+                   document.getElementById('prechat');
         if(!el) return;
         el.classList.add('min');
         document.getElementById('prechatBtn').textContent = 'Show';
