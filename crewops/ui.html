@@ -1226,6 +1226,44 @@ input, select { font: inherit; color: inherit; }
 .starter-chip.refuse{border-style:dashed}
 .starter-chip.refuse:hover{border-color:var(--brand-orange)}
 .starter-hint{font-size:.66rem;color:var(--ink-muted);padding:2px 0 0}
+
+/* ---- scenario flow ------------------------------------------------------
+   Four steps, because these are the four things a controller asks and the old
+   card answered only the last one: what happened, what breaks, who can take
+   it, what it costs. */
+.flow-bar{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-bottom:1px solid var(--hairline)}
+.flow-scn{font-size:.7rem;padding:5px 11px;border-radius:14px;cursor:pointer;font-family:inherit;
+  border:1px solid var(--hairline);background:var(--surface-2);color:var(--ink-secondary);white-space:nowrap}
+.flow-scn:hover{border-color:var(--brand-green);color:var(--ink-primary)}
+.flow-scn.busy{opacity:.5;pointer-events:none}
+.flow-scn b{font-family:var(--font-mono);font-size:.66rem;opacity:.75;margin-right:5px}
+
+.flow{border:1px solid var(--hairline);border-radius:8px;overflow:hidden;margin-top:12px;background:var(--surface-2)}
+.flow-step{display:grid;grid-template-columns:26px minmax(0,1fr);gap:0 12px;padding:12px 14px;
+  border-top:1px solid var(--hairline);position:relative}
+.flow-step:first-child{border-top:none}
+.flow-step::before{content:"";position:absolute;left:26px;top:30px;bottom:-12px;width:1px;background:var(--hairline)}
+.flow-step:last-child::before{display:none}
+.flow-num{width:19px;height:19px;border-radius:50%;display:grid;place-items:center;margin-top:1px;
+  font-family:var(--font-mono);font-size:.62rem;font-weight:700;
+  background:var(--surface);border:1px solid var(--hairline);color:var(--ink-muted)}
+.flow-step.done .flow-num{background:var(--brand-green-strong);border-color:var(--brand-green-strong);color:#fff}
+.flow-step.bad .flow-num{background:var(--status-critical);border-color:var(--status-critical);color:#fff}
+.flow-q{font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-muted);margin-bottom:4px}
+.flow-a{font-size:.8rem;color:var(--ink-primary);line-height:1.5}
+.flow-a .dim{color:var(--ink-secondary)}
+.flow-legs{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;align-items:center}
+.flow-leg{font-family:var(--font-mono);font-size:.66rem;padding:2px 7px;border-radius:3px;
+  background:var(--status-critical);color:#fff;opacity:.9}
+.flow-opt{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:baseline;
+  padding:6px 0;border-top:1px dashed var(--hairline);font-size:.75rem}
+.flow-opt:first-of-type{border-top:none}
+.flow-opt .rk{font-family:var(--font-mono);font-size:.64rem;color:var(--ink-muted)}
+.flow-opt .cost{font-family:var(--font-mono);font-weight:600;white-space:nowrap}
+.flow-opt.best .cost{color:var(--brand-green-strong)}
+.flow-opt.best .who{font-weight:600}
+.flow-save{margin-top:8px;padding:8px 11px;border-radius:6px;font-size:.74rem;
+  background:rgba(45,140,95,.10);border:1px solid var(--brand-green);color:var(--ink-primary)}
 </style>
 </head>
 <body>
@@ -1476,6 +1514,8 @@ input, select { font: inherit; color: inherit; }
                     </div>
                     <!-- Somewhere to start. Populated from /api/examples, which
                          has been returning these all along with nothing calling it. -->
+                    <!-- Six real disruptions, straight from scenarios.json. -->
+                    <div class="flow-bar" id="scenarioBar"></div>
                     <div class="starter-wrap" id="starterQuestions"></div>
                     <div class="chat-input-bar">
                         <input type="text" id="chatQueryInput" class="chat-input-field" placeholder="Ask about crew, rosters, duty hours, or a disruption" onkeydown="if(event.key==='Enter') sendChatQuery()">
@@ -1713,6 +1753,7 @@ Pick a crew member to draft a callout. Every figure in the message is read from 
         initTheme();
         renderRadarSpider('C-3310');
         loadStarterQuestions();      // never awaited: the desk must not wait on it
+        loadScenarioBar();
         await loadInitialData();
         initLiveStream();
     });
@@ -1912,6 +1953,148 @@ Pick a crew member to draft a callout. Every figure in the message is read from 
 
 
 
+
+
+    // ---- scenario flow ----------------------------------------------------
+    // The desk answered "who should cover this" and showed none of the middle.
+    // These are the four questions a controller actually asks, in order.
+    async function loadScenarioBar() {
+        const bar = document.getElementById('scenarioBar');
+        if (!bar) return;
+        try {
+            const list = await (await fetch('/api/scenarios')).json();
+            SCENARIOS = list;
+            bar.innerHTML = list.filter(function (x) { return x.runnable; })
+              .map(function (x) {
+                return '<button class="flow-scn" type="button" title="' +
+                    escapeHtml(x.narrative || '') + '" ' +
+                    'onclick="runScenario(this,' + JSON.stringify(x.id) + ')">' +
+                    '<b>' + escapeHtml(x.id) + '</b>' + escapeHtml(x.title) + '</button>';
+              }).join('');
+            stagger(bar.querySelectorAll('.flow-scn'), 30);
+        } catch (e) { bar.innerHTML = ''; }
+    }
+
+    let SCENARIOS = [];
+
+    function flowStep(n, question, answer, state) {
+        return '<div class="flow-step ' + (state || '') + '">' +
+            '<span class="flow-num">' + n + '</span>' +
+            '<span><div class="flow-q">' + question + '</div>' +
+            '<div class="flow-a">' + answer + '</div></span></div>';
+    }
+
+    // The event body for a scenario, built from the list the buttons came from.
+    function scenarioEvent(x) {
+        const base = {type: x.type};
+        const first = String(x.subject || '').split(',')[0].trim();
+        if (x.type === 'SICK_CREW' || x.type === 'CERT_EXPIRY') {
+            base.crew_id = first;
+        } else if (x.type === 'MULTI_SICK') {
+            base.type = 'SICK_CREW';       // resolve the first of the pair
+            base.crew_id = first;
+        } else if (x.type === 'DELAY') {
+            base.aircraft = x.subject;
+            base.delay_hours = 1.5;
+            base.date = '2026-09-16';
+        } else if (x.type === 'STATION_CLOSURE') {
+            base.station = x.subject;
+            base.start_utc = '2026-09-17T08:00:00Z';
+            base.end_utc = '2026-09-17T14:00:00Z';
+        }
+        return base;
+    }
+
+    async function runScenario(btn, sid) {
+        switchOCCView('console');
+        const feed = document.getElementById('chatFeed');
+        if (btn) btn.classList.add('busy');
+        const scn = SCENARIOS.find(function (x) { return x.id === sid; }) || {};
+
+        const userDiv = document.createElement('div');
+        userDiv.className = 'chat-bubble-user';
+        userDiv.textContent = 'Run ' + sid + ': ' + (scn.title || '');
+        feed.appendChild(userDiv);
+        enter(userDiv);
+
+        const card = document.createElement('div');
+        card.className = 'advisor-card-rich';
+        card.innerHTML = '<div class="flow">' +
+            flowStep(1, 'What happened', escapeHtml(scn.narrative || ''), 'done') +
+            flowStep(2, 'What breaks', '<span class="dim">working it out\u2026</span>', '') +
+            '</div>';
+        feed.appendChild(card);
+        enter(card);
+        feed.scrollTop = feed.scrollHeight;
+
+        try {
+            const res = await fetch('/api/resolve_event', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({dynamic_event: scenarioEvent(scn)})
+            });
+            const d = await res.json();
+            const imp = d.impact || {};
+            const sols = d.solutions || [];
+
+            // The legs, named. "3 flights uncrewed" is not something a
+            // controller can act on; DX412 is.
+            const byDay = imp.uncovered_by_day || {};
+            let legs = '';
+            Object.keys(byDay).forEach(function (day) {
+                legs += '<div class="flow-legs">' + byDay[day].map(function (f) {
+                    return '<span class="flow-leg">' +
+                        escapeHtml(String(f).split('-2026')[0]) + '</span>';
+                }).join('') + '<span class="dim" style="font-size:.68rem">' +
+                escapeHtml(day) + '</span></div>';
+            });
+
+            const legal = sols.filter(function (o) { return o.legal; });
+            const best = legal[0], next = legal[1];
+            const optHtml = legal.slice(0, 4).map(function (o, i) {
+                return '<div class="flow-opt' + (i === 0 ? ' best' : '') + '">' +
+                    '<span class="rk">#' + (o.rank || i + 1) + '</span>' +
+                    '<span class="who">' + escapeHtml(o.crew_id || '') +
+                    ' <span class="dim">' + escapeHtml(
+                        String(o.action || '').replace(/^Assign [A-Za-z ]+ /, '')) +
+                    '</span></span>' +
+                    '<span class="cost">' + (o.cost_inr
+                        ? 'INR ' + Number(o.cost_inr).toLocaleString('en-IN') : '') +
+                    '</span></div>';
+            }).join('');
+
+            let saving = '';
+            if (best && next && next.cost_inr > best.cost_inr) {
+                saving = '<div class="flow-save">Taking ' + escapeHtml(best.crew_id) +
+                    ' over the next legal option saves <b>INR ' +
+                    Number(next.cost_inr - best.cost_inr).toLocaleString('en-IN') +
+                    '</b>. Cancelling instead is INR 2,50,000 per leg.</div>';
+            }
+
+            card.querySelector('.flow').innerHTML =
+                flowStep(1, 'What happened', escapeHtml(scn.narrative || ''), 'done') +
+                flowStep(2, 'What breaks',
+                         escapeHtml(d.problem || 'No downstream impact.') + legs,
+                         imp.uncrewed_flights ? 'bad' : 'done') +
+                flowStep(3, 'Who can legally take it',
+                         legal.length
+                           ? '<span class="dim">' + legal.length + ' legal of ' +
+                             sols.length + ' considered</span>' + optHtml
+                           : '<span class="dim">No legal cover. That is the answer, not a failure.</span>',
+                         legal.length ? 'done' : 'bad') +
+                flowStep(4, 'What it costs',
+                         best ? escapeHtml(best.action || '') + saving
+                              : '<span class="dim">Nothing to price until there is a legal option.</span>',
+                         best ? 'done' : 'bad');
+            enter(card);
+        } catch (err) {
+            card.querySelector('.flow').innerHTML +=
+                flowStep(2, 'What breaks',
+                         'Could not run this scenario: ' + escapeHtml(err.message), 'bad');
+        } finally {
+            if (btn) btn.classList.remove('busy');
+            feed.scrollTop = feed.scrollHeight;
+        }
+    }
 
     // ---- starter questions ------------------------------------------------
     // Three tiers, because they are three different asks and a controller should
