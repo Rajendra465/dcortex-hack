@@ -208,6 +208,7 @@ class Snapshot:
     # derived
     roster: dict[str, list[DutyDay]] = field(default_factory=dict)
     flight_to_pairing: dict[str, tuple[str, str]] = field(default_factory=dict)
+    rule_params: dict[str, dict[str, Any]] = field(default_factory=dict)
     snapshot_utc: datetime = datetime(2026, 9, 14, 18, 0, 0)
 
     # ---- indices -------------------------------------------------------
@@ -406,6 +407,12 @@ def load(data_dir: str | None = None) -> Snapshot:
         roster[cid].sort(key=lambda x: x.report)
     snap.roster = dict(roster)
     snap.flight_to_pairing = f2p
+    
+    rule_params = {}
+    for r in snap.rules.get("rules", []):
+        rule_params[r["rule_id"]] = r.get("params", {})
+    snap.rule_params = rule_params
+    
     return snap
 
 

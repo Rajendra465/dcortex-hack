@@ -275,6 +275,74 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(r)
             elif path == "/api/examples":
                 self._json(EXAMPLES)
+            elif path == "/api/stream":
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream')
+                self.send_header('Cache-Control', 'no-cache')
+                self.send_header('Connection', 'keep-alive')
+                self.end_headers()
+                
+                import time, random
+                snap: Snapshot = _STATE["snap"]
+                
+                # Precompute active items to disrupt
+                assigned_crew = [cid for cid, c in snap.crew.items() if snap.pairings_for_crew(cid)]
+                active_flights = list(snap.flights.values())
+                stations = list(set(f.dep_station for f in active_flights))
+                
+                while True:
+                    try:
+                        ev_type = random.choice(["SICK_CREW", "DELAY", "STATION_CLOSURE"])
+                        payload = None
+                        
+                        if ev_type == "SICK_CREW" and assigned_crew:
+                            cid = random.choice(assigned_crew)
+                            pairings = snap.pairings_for_crew(cid)
+                            pid = pairings[0].pairing_id if pairings else None
+                            payload = {
+                                "scenario": "DYNAMIC",
+                                "title": f"Random Alert: Captain {cid} called in sick",
+                                "dynamic_event": {
+                                    "type": "SICK_CREW",
+                                    "crew_id": cid,
+                                    "pairing_id": pid
+                                }
+                            }
+                        elif ev_type == "DELAY" and active_flights:
+                            flight = random.choice(active_flights)
+                            delay_hrs = round(random.uniform(1.0, 4.0), 1)
+                            payload = {
+                                "scenario": "DYNAMIC",
+                                "title": f"Random Alert: {flight.aircraft} delayed {delay_hrs}h on {flight.date}",
+                                "dynamic_event": {
+                                    "type": "DELAY",
+                                    "aircraft": flight.aircraft,
+                                    "delay_hours": delay_hrs,
+                                    "date": flight.date
+                                }
+                            }
+                        elif ev_type == "STATION_CLOSURE" and stations:
+                            station = random.choice(stations)
+                            d = "2026-09-16"
+                            payload = {
+                                "scenario": "DYNAMIC",
+                                "title": f"Random Alert: {station} closed for 4 hours on {d}",
+                                "dynamic_event": {
+                                    "type": "STATION_CLOSURE",
+                                    "station": station,
+                                    "start_utc": f"{d}T08:00:00Z",
+                                    "end_utc": f"{d}T12:00:00Z"
+                                }
+                            }
+                        
+                        if payload:
+                            self.wfile.write(f"data: {json.dumps(payload)}\n\n".encode("utf-8"))
+                            self.wfile.flush()
+                        
+                        time.sleep(20)
+                    except Exception:
+                        break
+                return
             else:
                 self._json({"error": "not found"}, 404)
         except Exception as e:  # never leave the socket hanging
@@ -282,7 +350,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         route = self.path.split("?")[0]
-        if route not in ("/api/ask", "/api/whatif", "/api/reset", "/api/outreach"):
+        if route not in ("/api/ask", "/api/whatif", "/api/reset", "/api/set_region"):
             self._json({"error": "not found"}, 404)
             return
         try:
@@ -292,36 +360,68 @@ class Handler(BaseHTTPRequestHandler):
                 body = json.loads(self.rfile.read(n) or b"{}")
                 self._json(_outreach(snap, body))
                 return
-            if route in ("/api/whatif", "/api/reset"):
+            if route in ("/api/whatif", "/api/reset", "/api/set_region"):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")
+                
+                if route == "/api/set_region":
+                    with _LOCK:
+                        region = body.get("region", "in")
+                        data_dir = _STATE.get("data_dir")
+                        
+                        import shutil
+                        import os
+                        rules_src = os.path.join(data_dir or ".", f"rules_{region}.json")
+                        rules_dst = os.path.join(data_dir or ".", "rules.json")
+                        if os.path.exists(rules_src):
+                            shutil.copy(rules_src, rules_dst)
+                        
+                        from .data import load
+                        snap = load(data_dir)
+                        _STATE["snap"] = snap
+                        _STATE["advisor"] = Advisor(snap, use_model=_STATE["use_model"])
+                        _SESSIONS.clear()
+                    self._json({"ok": True, "region": region})
+                    return
+
                 entry = _session(str(body.get("session") or "default"))
                 with entry["lock"]:
                     if route == "/api/reset":
                         entry["s"].reset()
                     else:
                         scenario = body.get("scenario")
+                        dynamic_event = body.get("dynamic_event")
                         from .events import Delay, SickCrew, StationClosure
-                        if scenario == "S1" or scenario == "S2" or scenario == "S3":
-                            entry["s"].push_event(SickCrew(crew_id="C-1042", pairing_id="P-2291"))
-                        elif scenario == "S4":
-                            entry["s"].push_event(StationClosure(
-                                station="BLR",
-                                start_utc="2026-09-17T08:00:00Z",
-                                end_utc="2026-09-17T14:00:00Z",
-                            ))
-                        elif scenario == "S5":
-                            entry["s"].push_event(Delay(
-                                delay_hours=1.5,
-                                aircraft="VT-DXA",
-                                date="2026-09-16",
-                            ))
+                        
+                        if dynamic_event:
+                            ev_type = dynamic_event.get("type")
+                            if ev_type == "SICK_CREW":
+                                entry["s"].push_event(SickCrew(crew_id=dynamic_event.get("crew_id"), pairing_id=dynamic_event.get("pairing_id")))
+                            elif ev_type == "DELAY":
+                                entry["s"].push_event(Delay(delay_hours=dynamic_event.get("delay_hours"), aircraft=dynamic_event.get("aircraft"), date=dynamic_event.get("date")))
+                            elif ev_type == "STATION_CLOSURE":
+                                entry["s"].push_event(StationClosure(station=dynamic_event.get("station"), start_utc=dynamic_event.get("start_utc"), end_utc=dynamic_event.get("end_utc")))
                         else:
-                            cid = body.get("crew_id")
-                            if not cid or cid not in _STATE["snap"].crew:
-                                self._json({"error": f"unknown crew {cid}"}, 400)
-                                return
-                            entry["s"].push_event(SickCrew(crew_id=cid))
+                            if scenario == "S1" or scenario == "S2" or scenario == "S3":
+                                entry["s"].push_event(SickCrew(crew_id="C-1042", pairing_id="P-2291"))
+                            elif scenario == "S4":
+                                entry["s"].push_event(StationClosure(
+                                    station="BLR",
+                                    start_utc="2026-09-17T08:00:00Z",
+                                    end_utc="2026-09-17T14:00:00Z",
+                                ))
+                            elif scenario == "S5":
+                                entry["s"].push_event(Delay(
+                                    delay_hours=1.5,
+                                    aircraft="VT-DXA",
+                                    date="2026-09-16",
+                                ))
+                            else:
+                                cid = body.get("crew_id")
+                                if not cid or cid not in _STATE["snap"].crew:
+                                    self._json({"error": f"unknown crew {cid}"}, 400)
+                                    return
+                                entry["s"].push_event(SickCrew(crew_id=cid))
                     self._json({"ok": True, "what_if": entry["s"].what_if})
                 return
         except Exception as e:
@@ -384,6 +484,7 @@ def serve(host: str = "127.0.0.1", port: int = 8787,
           data_dir: str | None = None, use_model: bool | None = None) -> int:
     snap = load(data_dir)
     _STATE["snap"] = snap
+    _STATE["data_dir"] = data_dir or os.environ.get("CREWOPS_DATA_DIR") or "Problem Statement/data"
     _STATE["advisor"] = Advisor(snap, use_model=use_model)
     _STATE["use_model"] = use_model
     httpd = ThreadingHTTPServer((host, port), Handler)

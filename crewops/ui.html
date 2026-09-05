@@ -1069,6 +1069,13 @@ input, select { font: inherit; color: inherit; }
                     <input type="text" id="navbarSearchInput" placeholder="Ask advisor or search..." onkeydown="if(event.key==='Enter') executeNavbarSearch()">
                     <span class="kbd-badge">⌘K</span>
                 </div>
+                <!-- Region Selector -->
+                <div class="region-selector" style="margin-right: 15px; display: flex; align-items: center;">
+                    <select id="regionSelect" onchange="changeRegion(this.value)" style="background: var(--surface-low); border: 1px solid var(--border-light); color: var(--ink-primary); border-radius: 6px; padding: 6px 12px; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                        <option value="in">🇮🇳 India</option>
+                        <option value="eu">🇪🇺 Europe</option>
+                    </select>
+                </div>
                 
                 <!-- Sun/Moon Light/Dark Theme Switcher -->
                 <button class="icon-btn" id="themeToggleBtn" title="Toggle Light/Dark Theme" onclick="toggleTheme()">
@@ -1111,6 +1118,13 @@ input, select { font: inherit; color: inherit; }
                 <div class="kpi-texts">
                     <span class="kpi-title">Standby Reserves</span>
                     <span class="kpi-val" id="statReserves">16</span>
+                </div>
+            </div>
+            <div class="kpi-unit">
+                <div class="kpi-icon-box" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;"><i class="fa-solid fa-satellite-dish fa-beat-fade"></i></div>
+                <div class="kpi-texts">
+                    <span class="kpi-title">Data Stream</span>
+                    <span class="kpi-val" style="color: #ef4444; font-size: 1.1rem;" id="streamStatus">CONNECTING</span>
                 </div>
             </div>
             <div class="kpi-unit">
@@ -1497,7 +1511,41 @@ DGCA CAR Section 7 Legality:
         initTheme();
         renderRadarSpider('C-3310');
         await loadInitialData();
+        initLiveStream();
     });
+
+    // Live Stream via SSE
+    function initLiveStream() {
+        const eventSource = new EventSource("/api/stream");
+        const statusEl = document.getElementById("streamStatus");
+        
+        eventSource.onopen = () => {
+            statusEl.textContent = "LIVE";
+            statusEl.style.color = "#10b981"; // green
+            statusEl.previousElementSibling.style.color = "#10b981";
+            statusEl.previousElementSibling.style.background = "rgba(16, 185, 129, 0.15)";
+        };
+
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.scenario) {
+                    showToast(`📡 Live Event Received: ${data.title}`);
+                    // Automatically trigger the scenario locally in the dashboard
+                    triggerScenario(data.scenario, data.dynamic_event);
+                }
+            } catch (e) {
+                console.error("Error parsing live stream data", e);
+            }
+        };
+
+        eventSource.onerror = () => {
+            statusEl.textContent = "DISCONNECTED";
+            statusEl.style.color = "#ef4444"; // red
+            statusEl.previousElementSibling.style.color = "#ef4444";
+            statusEl.previousElementSibling.style.background = "rgba(239, 68, 68, 0.15)";
+        };
+    }
 
     // 1. Theme Engine (frontend-next Light/Dark Theme)
     function initTheme() {
@@ -1846,14 +1894,23 @@ CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
     }
 
     // 7. Scenario Triggers
-    async function triggerScenario(id) {
+    async function triggerScenario(id, dynamicEvent = null) {
         switchOCCView('console');
         try {
             await fetch('/api/whatif', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({scenario: id, session: STATE.session})
+                body: JSON.stringify({scenario: id, dynamic_event: dynamicEvent, session: STATE.session})
             });
+
+            if (dynamicEvent) {
+                let prompt = `Analyze this live disruption: ${dynamicEvent.type}`;
+                if (dynamicEvent.type === 'SICK_CREW') prompt = `Captain ${dynamicEvent.crew_id} called in sick. What are the recovery options?`;
+                if (dynamicEvent.type === 'DELAY') prompt = `${dynamicEvent.aircraft} is delayed ${dynamicEvent.delay_hours}h on ${dynamicEvent.date}. Does this breach FDP?`;
+                if (dynamicEvent.type === 'STATION_CLOSURE') prompt = `${dynamicEvent.station} is closed. How does this affect flights?`;
+                await submitCustomPrompt(prompt);
+                return;
+            }
 
             const prompts = {
                 'S1': 'Captain C-1042 just called in sick for tomorrow - which flights are now uncrewed?',
@@ -2006,6 +2063,23 @@ CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
     function escapeHtml(s) {
         if (!s) return '';
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    
+    async function changeRegion(regionCode) {
+        try {
+            const res = await fetch("/api/set_region", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ region: regionCode })
+            });
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                console.error("Failed to set region");
+            }
+        } catch (e) {
+            console.error("Error setting region", e);
+        }
     }
     </script>
 </body>

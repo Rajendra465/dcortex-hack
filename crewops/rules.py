@@ -98,12 +98,15 @@ class Ledger:
 # --------------------------------------------------------------------------
 
 
-def fdp_limit(sectors: int) -> float:
-    """RULE-FDP-01. 13h base, minus 30 min per sector beyond the second.
-
+def fdp_limit(sectors: int, params: dict[str, Any]) -> float:
+    """RULE-FDP-01. Base fdp, minus reduction per sector beyond the free sectors.
+    
     Counted PER DUTY DAY, not per pairing: 2 legs -> 13.0, 3 -> 12.5, 4 -> 12.0.
     """
-    return 13.0 - 0.5 * max(0, sectors - 2)
+    base = params.get("base_fdp_hours", 13.0)
+    red = params.get("reduction_per_extra_sector_hours", 0.5)
+    free = params.get("free_sectors", 2)
+    return base - red * max(0, sectors - free)
 
 
 def duty_period(day: PairingDay) -> tuple[float, datetime, datetime]:
@@ -207,13 +210,19 @@ def rule_cert_06(snap: Snapshot, crew_id: str, on: date, led: Ledger,
     return []
 
 
-def rule_fdp_01(day: PairingDay, led: Ledger) -> list[str]:
+def rule_fdp_01(snap: Snapshot, day: PairingDay, led: Ledger) -> list[str]:
     fdp, _rep, _rel = duty_period(day)
-    lim = fdp_limit(day.sectors)
+    params = snap.rule_params.get("RULE-FDP-01", {})
+    lim = fdp_limit(day.sectors, params)
+    
+    base = params.get("base_fdp_hours", 13.0)
+    red = params.get("reduction_per_extra_sector_hours", 0.5)
+    free = params.get("free_sectors", 2)
+
     led.add("sectors", day.sectors, source="rosters.json")
     led.add("fdp_hours", fdp, "h", derivation="release - report")
     led.add("fdp_limit_hours", lim, "h",
-            derivation=f"13.0 - 0.5 x max(0, {day.sectors} - 2)")
+            derivation=f"{base} - {red} x max(0, {day.sectors} - {free})")
     led.add("fdp_margin_hours", round(lim - fdp, 2), "h")
     if fdp > lim + EPS:
         return [f"RULE-FDP-01: FDP {fdp}h > {lim}h limit ({day.sectors} sectors)"]
@@ -232,14 +241,17 @@ def rule_duty_02(snap: Snapshot, crew_id: str, cover_days: list[PairingDay],
     are being moved *onto* the trip, not stacked on top of it.
     """
     issues: list[str] = []
-    cap = 60.0
+    params = snap.rule_params.get("RULE-DUTY-02", {})
+    cap = float(params.get("max_duty_hours", 60.0))
+    window_days = int(params.get("window_days", 7))
+    
     led.add("duty_cap_hours", cap, "h", source="rules.json RULE-DUTY-02")
-    led.add("duty_window_days", 7, "days", source="rules.json RULE-DUTY-02")
+    led.add("duty_window_days", window_days, "days", source="rules.json RULE-DUTY-02")
 
     for day in cover_days:
         d = day.day
         base, breakdown = window_sum(
-            snap, crew_id, d, 7, "duty", exclude_pairing=exclude_pairing
+            snap, crew_id, d, window_days, "duty", exclude_pairing=exclude_pairing
         )
         # cumulative cover duty up to and including this date, undelayed length
         add = round(sum(duty_period(x)[0] for x in cover_days if x.day <= d), 2)
@@ -252,9 +264,9 @@ def rule_duty_02(snap: Snapshot, crew_id: str, cover_days: list[PairingDay],
         led.add(f"duty_7d_headroom[{d}]", round(cap - total, 2), "h")
         if total > cap + EPS:
             excess = total - cap
-            led.add(f"duty_7d_excess[{d}]", round(excess, 2), "h")
+            led.add(f"duty_{window_days}d_excess[{d}]", round(excess, 2), "h")
             issues.append(
-                f"RULE-DUTY-02: would exceed 60h/7d by {fmt_hm(excess)} "
+                f"RULE-DUTY-02: would exceed {cap}h/{window_days}d by {fmt_hm(excess)} "
                 f"on {d} (total {total}h)"
             )
     return issues
@@ -272,24 +284,27 @@ def rule_flt_03(snap: Snapshot, crew_id: str, cover_days: list[PairingDay],
 
     Returns (issues, binding).
     """
-    cap = 100.0
+    params = snap.rule_params.get("RULE-FLT-03", {})
+    cap = float(params.get("max_flight_hours", 100.0))
+    window_days = int(params.get("window_days", 28))
+    
     binding = False
     issues: list[str] = []
     for day in cover_days:
         d = day.day
-        base, _ = window_sum(snap, crew_id, d, 28, "flight",
+        base, _ = window_sum(snap, crew_id, d, window_days, "flight",
                              exclude_pairing=exclude_pairing)
         led.add(f"flight_28d[{d}]", base, "h",
                 source="duty_clocks.daily_history + rosters.json")
         led.add(f"flight_28d_headroom[{d}]", round(cap - base, 2), "h")
         if base > cap + EPS:
             binding = True
-            issues.append(f"RULE-FLT-03: would exceed 100h/28d on {d} (total {base}h)")
+            issues.append(f"RULE-FLT-03: would exceed {cap}h/{window_days}d on {d} (total {base}h)")
     led.add("flight_cap_hours", cap, "h", source="rules.json RULE-FLT-03")
     return issues, binding
 
 
-def rule_rest_04(sim: list[tuple], led: Ledger) -> list[str]:
+def rule_rest_04(snap: Snapshot, sim: list[tuple], led: Ledger) -> list[str]:
     """RULE-REST-04 -- minimum 12h between release and the next report.
 
     TRAP 13: rest conflicts are frequently NOT on the cover days. C-5837 is
@@ -302,7 +317,8 @@ def rule_rest_04(sim: list[tuple], led: Ledger) -> list[str]:
     two strings, joined by "; ".
     """
     issues: list[str] = []
-    min_rest = 12.0
+    params = snap.rule_params.get("RULE-REST-04", {})
+    min_rest = float(params.get("min_rest_hours", 12.0))
     led.add("min_rest_hours", min_rest, "h", source="rules.json RULE-REST-04")
 
     for a, b in zip(sim, sim[1:]):
