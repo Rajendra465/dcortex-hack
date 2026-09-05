@@ -382,6 +382,12 @@ INTENTS: list[Intent] = [
         "any illegal assignments", "what have we missed",
     ], boost=1.2),
 
+    Intent("morning_brief", [
+        "standing morning briefing", "what should the briefing show",
+        "which three data points", "morning brief", "what to surface daily",
+        "start of day board", "what should the desk look at",
+    ], boost=1.4),
+
     Intent("reserve_gaps", [
         "reserve coverage gaps", "standby holes", "hours with no standby",
         "when do we have no reserve",

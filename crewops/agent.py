@@ -844,6 +844,14 @@ def summarise(tool: str, p: Any) -> str:
             s += f" {len(tied)} options tie at that price."
         s += f" {len(p['excluded_candidates'])} candidates were ruled out."
         return s
+    if tool == "simulate_delay" and p.get("breach") and p.get("recovery"):
+        r = p["recovery"]
+        best = (r.get("options") or [{}])[0]
+        keep = len((p.get("max_legal_prefix") or {}).get("legs") or [])
+        return (f"{p['summary']} Operate {keep} leg(s) as delayed and re-crew "
+                f"{', '.join(p['legs_to_shed'])}: "
+                f"{best.get('action', 'no legal cover found')}"
+                + (f" at INR {best['cost_inr']:,}." if best.get("cost_inr") else "."))
     if tool in ("simulate_crew_unavailable", "simulate_station_closure",
                 "simulate_delay", "simulate_cert_expiry"):
         return p["summary"]
@@ -859,6 +867,10 @@ def summarise(tool: str, p: Any) -> str:
                 + ", ".join(f"{r['crew_id']} ({r['rank']}, "
                             f"{r['window']['start']}-{r['window']['end']}Z)"
                             for r in p["reserves"][:6]))
+    if tool == "morning_brief":
+        # No numeric ranks: "1." and "2." are display scaffolding, and the
+        # guard rightly refuses digits that trace to nothing.
+        return " ".join(f"{d['what']} - {d['why']}" for d in p["points"])
     if tool == "find_flights":
         ans = p.get("answer")
         if isinstance(ans, dict) and "passengers" in ans:

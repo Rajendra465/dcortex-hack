@@ -163,6 +163,63 @@ def find_flights(snap: Snapshot, **kw: Any) -> Result:
     return payload, led
 
 
+@tool("morning_brief", {}, (), "optimisation",
+      "The three things a standing morning briefing should carry, and why.")
+def morning_brief(snap: Snapshot, **kw: Any) -> Result:
+    """What a desk should look at before the day starts.
+
+    This question -- "which three data points should a standing briefing
+    surface and why" -- routed to get_risk_signals and answered with 150 rows.
+    Every row was true and none of it was an answer.
+
+    The three below are chosen by what the data shows rather than by what
+    sounds sensible, and each carries the number that earns it a place.
+    """
+    from .kernel import cover_fragility, reserve_coverage_gaps, latent_breaches
+    led = Ledger()
+
+    peak_id, peak = max(((c["crew_id"], c["duty_hours_7d"])
+                         for c in snap.clocks.values()), key=lambda x: x[1])
+    cap = float(snap.rule_params.get("RULE-DUTY-02", {}).get("max_duty_hours", 60))
+    gaps = len(reserve_coverage_gaps(snap))
+    thin = [r for r in cover_fragility(snap, roles=("Captain",))
+            if r["legal_covers"] <= 1]
+    risk = [r for r in snap.risk.values() if r.get("drivers") != ["baseline"]]
+    illegal = latent_breaches(snap)
+
+    led.add("peak_duty_7d", round(peak, 2), "h", source="duty_clocks.json")
+    led.add("duty_cap_hours", cap, "h", source="rules.json RULE-DUTY-02")
+    led.add("standby_gap_hours", gaps)
+    led.add("single_cover_trips", len(thin))
+    led.add("flagged_crew", len(risk))
+    led.add("already_illegal", len(illegal))
+
+    return {
+        "points": [
+            {"rank": 1, "what": "Duty headroom against the weekly ceiling",
+             "why": (f"peak utilisation is {round(peak, 2)}h of {cap:g}h "
+                     f"({peak_id}) -- close enough that one callout breaches "
+                     "it, so it belongs on the board before it does."),
+             "value": round(peak, 2), "unit": "h"},
+            {"rank": 2, "what": "Standby cover by window and rating",
+             "why": (f"{gaps} rank-hours of the day have no reserve on call at "
+                     "all. A sick call inside one of those has no answer, and "
+                     "that is a fact about the roster, not about the shift."),
+             "value": gaps, "unit": "rank-hours uncovered"},
+            {"rank": 3, "what": "Single-cover trips and flagged crew",
+             "why": (f"{len(thin)} trip(s) have one legal captain and "
+                     f"{len(risk)} crew carry a non-baseline risk signal -- "
+                     "single points of failure a controller cannot see by "
+                     "reading the roster."),
+             "value": len(thin), "unit": "single-cover trips"},
+        ],
+        "already_illegal": illegal,
+        "note": ("A passenger-impact panel is deliberately absent: the data "
+                 "carries seats, not bookings, so it would report capacity "
+                 "and be read as passengers."),
+    }, led
+
+
 @tool("find_crew",
       {"crew_id": "e.g. C-1042", "rank": "Captain | First Officer | "
        "Senior Cabin Crew | Cabin Crew",
@@ -536,9 +593,38 @@ def simulate_station_closure(snap: Snapshot, **kw: Any) -> Result:
       "A technical delay: does the extended duty breach the FDP limit, and how "
       "many legs can the original crew still legally operate?")
 def simulate_delay(snap: Snapshot, **kw: Any) -> Result:
+    """A delay that breaks FDP is half an answer without the recovery.
+
+    The question the brief asks is "what should Crew Control DO about the FDP
+    breach", and this returned only the breach. The legal prefix was already
+    computed -- how many legs the rostered crew can still operate -- so the
+    remaining work is who takes the legs they cannot, and what that costs.
+    """
     imp = analyse_delay(snap, float(kw["delay_hours"]), kw.get("aircraft"),
                         kw.get("pairing_id"), kw.get("date"))
-    return imp.to_dict(), imp.ledger
+    out = imp.to_dict()
+
+    if out.get("breach") and out.get("legs_to_shed"):
+        # cover_options wants the duty days, not a pairing id -- the same
+        # trip on a different day is a different legality question.
+        pid = out.get("pairing_id")
+        day = out.get("event", {}).get("date")
+        p = snap.pairings.get(pid) if pid else None
+        days = [d for d in (p.days if p else []) if not day or d.date == day]
+        opts = cover_options(snap, days, "Captain") if days else None
+        legal = [o.to_dict() for o in (opts.legal_options if opts else [])]
+        out["recovery"] = {
+            "keep": (out.get("max_legal_prefix") or {}).get("legs", []),
+            "recrew": out["legs_to_shed"],
+            "options": legal[:3],
+            "considered": len(opts.options) if opts else 0,
+        }
+        imp.ledger.add("legs_kept", len(out["recovery"]["keep"]))
+        imp.ledger.add("legs_recrewed", len(out["recovery"]["recrew"]))
+        if legal:
+            imp.ledger.add("recovery_cost_inr", legal[0]["cost_inr"], "INR",
+                           source="costs.json")
+    return out, imp.ledger
 
 
 @tool("simulate_cert_expiry", {"crew_id": "e.g. C-5417"}, ("crew_id",),
