@@ -291,6 +291,53 @@ def _scenario_list() -> list[dict[str, Any]]:
     return out
 
 
+def _consequences(before: Snapshot, after: Snapshot, crew_id: str,
+                  pairing_id: str) -> dict[str, Any]:
+    """What this decision costs, measured rather than asserted.
+
+    Three things a controller wants the moment they commit: is the trip
+    actually covered now, what did it do to this person's own week, and who
+    just stopped being available to everybody else.
+    """
+    from .kernel import cover_fragility, reserve_coverage_gaps
+    out: dict[str, Any] = {}
+
+    p = after.pairings.get(pairing_id)
+    out["covered"] = bool(p and p.crew_in_role("Captain"))
+    out["crew_now_on"] = [f"{c} ({r})" for c, r in (p.crew if p else ())]
+
+    days = len(after.roster.get(crew_id, [])) - len(before.roster.get(crew_id, []))
+    clock = after.clocks.get(crew_id)
+    out["own_week"] = {
+        "crew_id": crew_id,
+        "duty_days_added": days,
+        "duty_hours_7d": round(getattr(clock, "duty_hours_7d", 0.0) or 0.0, 2),
+    }
+
+    # Who this takes off the board. A standby captain who is now flying is not
+    # standby cover for the next sick call, and that is the consequence a
+    # controller most often discovers too late.
+    out["left_standby"] = crew_id in before.reserves
+    # Trips with one legal captain or none. This is the number that matters:
+    # it counts how close the week is to having no answer at all, and a
+    # decision that fixes today by making tomorrow single-threaded should say so.
+    def thin(sn: Snapshot) -> int:
+        try:
+            return sum(1 for r in cover_fragility(sn, roles=("Captain",))
+                       if r.get("legal_covers", 99) <= 1)
+        except Exception:
+            return -1
+    b, a = thin(before), thin(after)
+    if b >= 0 and a >= 0:
+        out["single_cover_trips"] = {"before": b, "after": a, "delta": a - b}
+    try:
+        out["standby_gap_hours"] = {"before": len(reserve_coverage_gaps(before)),
+                                    "after": len(reserve_coverage_gaps(after))}
+    except Exception:
+        pass
+    return out
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -422,11 +469,46 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         route = self.path.split("?")[0]
-        if route not in ("/api/ask", "/api/whatif", "/api/reset", "/api/set_region", "/api/resolve_event"):
+        if route not in ("/api/ask", "/api/whatif", "/api/reset", "/api/set_region",
+                         "/api/resolve_event", "/api/commit"):
             self._json({"error": "not found"}, 404)
             return
         try:
             snap: Snapshot = _STATE["snap"]
+            if route == "/api/commit":
+                # Authorising is the only action on this desk that changes the
+                # world. It goes through the same Session overlay as every
+                # what-if, so it is visible, reversible with /api/reset, and
+                # every later answer is computed in the world it created.
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+                crew_id = str(body.get("crew_id") or "")
+                pairing_id = str(body.get("pairing_id") or "")
+                role = str(body.get("role") or "Captain")
+                sid = str(body.get("session") or "default")
+                if crew_id not in snap.crew:
+                    self._json({"error": f"unknown crew {crew_id}"}, 400)
+                    return
+                if pairing_id not in snap.pairings:
+                    self._json({"error": f"unknown pairing {pairing_id}"}, 400)
+                    return
+                from .events import Assign, apply as apply_events
+                entry = _session(sid)
+                with entry["lock"]:
+                    sess = entry["s"]
+                    before = apply_events(sess.base, list(sess.events))
+                    sess.push_event(Assign(crew_id=crew_id, pairing_id=pairing_id,
+                                           role=role))
+                    after = apply_events(sess.base, list(sess.events))
+                    self._json({
+                        "ok": True,
+                        "assigned": {"crew_id": crew_id, "pairing_id": pairing_id,
+                                     "role": role},
+                        "what_if": sess.what_if,
+                        "consequences": _consequences(before, after, crew_id,
+                                                      pairing_id),
+                    })
+                return
             if route == "/api/resolve_event":
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")
