@@ -516,8 +516,23 @@ def cover_fragility(snap: Snapshot, roles: Iterable[str] = PILOT_RANKS,
 def reserve_coverage_gaps(snap: Snapshot) -> list[dict[str, Any]]:
     """Hours of the day with no on-call reserve for a rank/type combination.
 
-    Finds a real structural hole in this roster: no reserve captain of any
-    rating is on call between 19:00Z and 02:00Z.
+    Two real structural holes in this roster, and they are not the same hole:
+
+      Captain / A320    uncovered 19:00-23:59Z  (5 hours)
+      Captain / ATR72   uncovered 16:00-23:59Z and 00:00-02:59Z  (11 hours)
+
+    So an evening sick call has no standby captain on either fleet, and the
+    turboprop has no standby captain for eleven hours of the day including the
+    whole small-hours window an early departure would be crewed from. An
+    earlier version of this docstring claimed a single 19:00-02:00 gap "of any
+    rating", which is wrong in both directions: A320 is covered again from
+    midnight by C-3305 (00:00-05:30), and ATR72 goes dark three hours earlier.
+
+    An on-call window is treated as covering every hour it touches, so
+    00:00-05:30 covers hour 5. Windows that wrap midnight are handled even
+    though none in this dataset does -- the previous comparison silently
+    returned "no cover at all" for such a window rather than failing, which is
+    the kind of quiet wrong answer this system exists to avoid.
     """
     out = []
     types = sorted({f.aircraft_type for f in snap.flights.values()})
@@ -527,7 +542,10 @@ def reserve_coverage_gaps(snap: Snapshot) -> list[dict[str, Any]]:
             for cid, r in snap.reserves.items():
                 if snap.crew[cid].rank != rank:
                     continue
-                if int(r.window_start[:2]) <= hour <= int(r.window_end[:2]):
+                start_h, end_h = int(r.window_start[:2]), int(r.window_end[:2])
+                on_call = (start_h <= hour <= end_h if start_h <= end_h
+                           else hour >= start_h or hour <= end_h)
+                if on_call:
                     for t in types:
                         if t in snap.crew[cid].ratings:
                             covered[t].append(cid)

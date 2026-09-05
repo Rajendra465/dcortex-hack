@@ -32,6 +32,7 @@ from .orchestrator import (CONFIDENT, FLOOR, PAT, Entities, Plan, PlanError,
                            execute, extract, plan_from_index,
                            plan_from_model, score_intents, validate)
 from .rules import Ledger
+from .trace import CHOOSE, Option, Trace
 from .tools import REGISTRY, Unanswerable
 
 SNAPSHOT_UTC = "2026-09-14T18:00:00Z"
@@ -369,11 +370,15 @@ class Answer:
     confidence: str = "high"
     confidence_why: str = ""
     overlays: list[str] = field(default_factory=list)
+    trace: Trace | None = None
 
     def to_dict(self) -> dict[str, Any]:
         if self.refusal:
-            return {**self.refusal.to_dict(), "query": self.question,
-                    "confidence": "none", "elapsed_ms": round(self.ms, 1)}
+            d = {**self.refusal.to_dict(), "query": self.question,
+                 "confidence": "none", "elapsed_ms": round(self.ms, 1)}
+            if self.trace:
+                d["trace"] = self.trace.to_dict()
+            return d
         return {
             "query": self.question,
             "tier": self.tier,
@@ -389,6 +394,7 @@ class Answer:
             "confidence_why": self.confidence_why,
             "evidence": self.ledger.as_dict(),
             "elapsed_ms": round(self.ms, 1),
+            "trace": self.trace.to_dict() if self.trace else None,
         }
 
 
@@ -427,24 +433,30 @@ class Advisor:
 
     def ask(self, question: str) -> Answer:
         t0 = time.perf_counter()
+        tr = Trace()
 
         def done(**kw: Any) -> Answer:
             kw.setdefault("tier", 0); kw.setdefault("plan", None)
             kw.setdefault("payload", None); kw.setdefault("prose", "")
             kw.setdefault("provenance", "deterministic")
             kw.setdefault("ledger", Ledger())
-            return Answer(question=question,
+            return Answer(question=question, trace=tr,
                           ms=(time.perf_counter() - t0) * 1000, **kw)
 
         # 1. policy screens -- declarative, and cheaper than any model call
-        for screen in (screen_scope(question), screen_dates(question, self.snap)):
+        for label, screen in (("scope", screen_scope(question)),
+                              ("horizon", screen_dates(question, self.snap))):
             if screen:
+                tr.gate(label, False, screen.message, refusal=screen.kind)
                 return done(refusal=screen, prose=screen.message)
+            tr.gate(label, True)
         for cid in PAT["crew_id"].findall(question):
             if cid not in self.snap.crew:
                 r = Refusal("UNKNOWN_ENTITY", f"{cid} is not in this dataset.",
                             have=f"{len(self.snap.crew)} crew on file")
+                tr.gate("entity exists", False, r.message, refusal=r.kind)
                 return done(refusal=r, prose=r.message)
+        tr.gate("entity exists", True)
 
         # 2. entities, then PLAN. The model is the primary planner when it is
         #    configured; the deterministic index is the fast path and the
@@ -458,8 +470,21 @@ class Advisor:
         # else goes to the model, which is the actual planner. If neither is
         # sure, we refuse: serving the nearest plausible tool is how an
         # unrecognised question came back as somebody else's answer.
+        tr.derive("entities", ", ".join(
+            f"{k}={v}" for k, v in ents.as_dict().items() if v) or "none found",
+            **{k: v for k, v in ents.as_dict().items() if v})
+
         ranked = score_intents(question, ents)
         top = ranked[0][0] if ranked else 0.0
+        tr.choose("route", [
+            Option(i.tool, s, chosen=(n == 0 and s >= FLOOR),
+                   why=("above the confident bar" if n == 0 and s >= CONFIDENT
+                        else "leads, but below the confident bar" if n == 0
+                        else "outscored"))
+            for n, (s, i) in enumerate(ranked[:5])],
+            detail=(f"{len(ranked)} capabilities scored; "
+                    f"lead {top:.2f} vs confident bar {CONFIDENT}"),
+            confident_bar=CONFIDENT, floor=FLOOR)
 
         plan, clarify = None, None
         try:
@@ -470,13 +495,53 @@ class Advisor:
             # Hold that clarifying question: the model may still resolve the
             # missing argument, and if it cannot, asking beats guessing.
             clarify = e
-        if plan is None and self.client:
-            plan = plan_from_model(question, ents, self.client)
+
+        # The planner race, recorded. Two independent planners can answer this
+        # question -- a deterministic intent index and the model -- and either
+        # can win. Where both produce a plan we keep BOTH and compare them,
+        # because two planners that agree is evidence about the question, and
+        # two that disagree is a fact a controller should see rather than a tie
+        # somebody silently broke. This is the only "council" in the system,
+        # and it works because the arbiter is deterministic: the index is not
+        # judging the model's prose, it is proposing a rival typed plan that
+        # the same validator has to accept.
+        index_plan, model_plan = plan, None
+        if self.client:
+            model_plan = plan_from_model(question, ents, self.client)
+        if plan is None:
+            plan = model_plan
         if plan is None and clarify is None and top >= FLOOR:
             try:
-                plan = plan_from_index(question, ents, self.snap, FLOOR)
+                plan = index_plan = plan_from_index(question, ents,
+                                                    self.snap, FLOOR)
             except PlanError as e:
                 clarify = e
+
+        if index_plan or model_plan:
+            agree = (index_plan is not None and model_plan is not None
+                     and index_plan.tools == model_plan.tools)
+            chosen = "index" if plan is index_plan else "model"
+            opts = []
+            if index_plan is not None:
+                opts.append(Option("index: " + " -> ".join(index_plan.tools),
+                                   chosen=plan is index_plan,
+                                   why="deterministic, reproducible, instant"))
+            elif self.client:
+                opts.append(Option("index: no plan", chosen=False,
+                                   why=f"lead {top:.2f} below the bar"))
+            if model_plan is not None:
+                opts.append(Option("model: " + " -> ".join(model_plan.tools),
+                                   chosen=plan is model_plan,
+                                   why="reads phrasing the index has never seen"))
+            elif self.client:
+                opts.append(Option("model: no plan", chosen=False,
+                                   why="model returned nothing usable"))
+            tr.choose("planners", opts, agreement=(
+                "both planners produced the same chain" if agree
+                else "planners disagreed - the validator arbitrates" if
+                (index_plan and model_plan) else
+                f"only the {chosen} planner produced a plan"),
+                detail=f"{chosen} plan adopted")
         if plan is None and clarify is not None:
             # "add the which crew member or trip" -- the naive f-string read
             # as broken English the moment `would_need` started carrying a
@@ -507,13 +572,19 @@ class Advisor:
         for st in plan.steps:
             late = screen_dates(question, self.snap, st.tool)
             if late:
+                tr.gate("tool horizon", False, late.message, tool=st.tool)
                 return done(plan=plan, refusal=late, prose=late.message)
+        tr.gate("tool horizon", True,
+                f"{plan.tool}'s own horizon, not the union of every domain's")
         try:
             validate(plan)
         except PlanError as e:
             r = Refusal("CLARIFY" if e.would_need else "PARSE_FAIL", e.message,
                         have=e.have, would_need=e.would_need)
+            tr.gate("plan valid", False, e.message)
             return done(plan=plan, refusal=r, prose=r.message)
+        tr.gate("plan valid", True,
+                f"{len(plan.steps)} step(s), every argument bound and typed")
 
         # 4. execute the chain
         try:
@@ -535,8 +606,41 @@ class Advisor:
         if len(plan.steps) > 1:
             assumptions.append(
                 "chained " + " -> ".join(st.tool for st in plan.steps))
+        tr.derive("kernel", " -> ".join(st.tool for st in plan.steps),
+                  facts=len(ledger.as_dict()), tier=tier)
+
+        # The layer under the plan: the kernel checked every crew member on the
+        # payroll against all seven rules and threw most of them away. Those
+        # rejections are the answer to "why not someone else", and until now
+        # they were computed and discarded.
+        if isinstance(payload, dict) and "excluded_candidates" in payload:
+            opts = [Option(o.get("crew_id") or "?", chosen=(o.get("rank") == 1),
+                           why=(o.get("reasoning") or "")[:120])
+                    for o in (payload.get("options") or [])[:8]]
+            for ex in (payload.get("excluded_candidates") or [])[:8]:
+                if isinstance(ex, dict):
+                    opts.append(Option(ex.get("crew_id") or "?", chosen=False,
+                                       why=(ex.get("reason") or
+                                            ex.get("why") or "")[:120]))
+            pool = payload.get("candidate_pool_size")
+            legal = sum(1 for o in (payload.get("options") or [])
+                        if o.get("legal"))
+            tr.choose("candidates", opts,
+                      detail=(f"{pool} crew checked against 7 rules; "
+                              f"{legal} legal, {len(payload.get('options') or [])} ranked"),
+                      pool=pool, legal=legal)
         summary = summarise(plan.tool, payload)
         prose, prov = narrate(question, ledger, self.client, summary)
+        tr.speak("narrate", f"prose written by the {prov}", source=prov)
+
+        # The guard reads the finished sentence back against the ledger. It is
+        # the last thing between a fluent number and a controller's screen.
+        clean, bad = guard_numbers(prose, ledger)
+        tr.gate("number guard", clean,
+                (f"every figure in the sentence traces to the kernel"
+                 if clean else f"unbacked: {', '.join(bad)}"),
+                checked=len(ledger.allowed_numbers()),
+                unbacked=bad or None)
         conf, why = confidence_of(plan.tool, prov, payload)
         return done(tier=tier, plan=plan, payload=payload, prose=prose,
                     provenance=prov, ledger=ledger, assumptions=assumptions,
