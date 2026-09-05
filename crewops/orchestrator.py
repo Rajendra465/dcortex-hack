@@ -300,10 +300,35 @@ INTENTS: list[Intent] = [
 ], needs=("crew",), boost=1.2),
 
     Intent("simulate_crew_unavailable", [
-        "called in sick which flights", "what breaks if", "which flights uncrewed",
-        "what is the impact", "what is affected", "which legs are uncovered",
-        "now uncrewed",
-    ], needs=("crew",), boost=1.1),
+        "called in sick which flights", "what breaks if",
+        # These were two and three tokens long, so an unrelated question
+        # scored 0.67 on them by containing "which" and "flight". That is how
+        # "which single leg has the most seats at risk if cancelled" -- a
+        # question naming no crew at all -- came within a boost of being
+        # answered as a sick call. Longer cues cannot be part-matched into a
+        # false positive.
+        "which flights are now uncrewed", "which flights are uncrewed now",
+        "what is the crew impact", "what is affected by this",
+        "which legs are now uncovered", "which sectors are now uncrewed",
+        # The brief's own Tier 2 example -- "Captain C-1042 just called in sick
+        # for tomorrow, which flights are now uncrewed?" -- routed to
+        # get_reserves, because "called in sick" contains "call" and
+        # get_reserves cues on "on call". It answered with a list of standby
+        # crew: the wrong question, answered confidently.
+        "just called in sick", "called in sick for tomorrow",
+        "has called in sick", "has reported sick", "calls in sick today",
+        # "sick which flights" and "is sick which flights" reduced to the three
+        # tokens {sick, which, flight}, which an unrelated question part-matched
+        # at 0.67 on "which" and "flight" alone. Every cue here now carries a
+        # word that only appears in a sick call.
+        # 1.15, arrived at by measurement rather than taste. At 1.10 the
+        # brief's own Tier 2 question went to rank_cover_options (1.36 against
+        # 1.32) -- a defensible answer to a question nobody asked, since it
+        # asks WHICH FLIGHTS are uncrewed, not who could cover them. At 1.25 it
+        # also claimed "which leg has the most seats at risk if cancelled",
+        # which names no crew at all. 1.15 clears the first and not the second,
+        # and the needs=("crew",) penalty is what keeps the second out.
+    ], needs=("crew",), boost=1.15),
 
     Intent("simulate_station_closure", [
         "station is closed", "airport shut", "closed between", "closure impact",
@@ -368,8 +393,14 @@ INTENTS: list[Intent] = [
     ]),
 
     Intent("get_reserves", [
-        "who is on reserve", "standby crew", "on call", "reserve list",
-        "who is on standby",
+        "who is on reserve", "standby crew", "reserve list", "who is on standby",
+        # "on call" reduced to the single token {call}, which any one-token cue
+        # does: a lone word scores a perfect 1.0 overlap ratio and outruns a
+        # precise multi-word cue. So "Captain C-1042 just called in sick" --
+        # the brief's own flagship Tier 2 question -- matched a RESERVE LISTING
+        # on the word "called", and got one, confidently.
+        # The cue says what it meant all along.
+        "who is on call today", "on call window", "which reserves are on call",
     ]),
 
     Intent("get_certifications", [
@@ -381,7 +412,13 @@ INTENTS: list[Intent] = [
         "which certification expire", "certification expiring between",
         "which licence lapse before", "medical class expiring",
         "whose recurrent training runs out",
-    ], boost=1.2),
+        # The brief's phrasing. This scored 0.80 against find_crew's 1.00 and
+        # the answer came back as all 150 crew -- which reads like a list of
+        # people about to lapse and is the opposite of one.
+        "licence expires", "licence expires in the next",
+        "crew whose licence", "certificates expire in the next",
+        "expiring in the next days", "who is about to lapse",
+    ], boost=1.35),
 
     Intent("get_roster", [
         "who is assigned", "roster for", "crew on the pairing",
@@ -639,6 +676,34 @@ def bind_args(tool: str, ents: Entities, snap: Snapshot,
     def put(k: str, v: Any) -> None:
         if k in params and v is not None and k not in a:
             a[k] = v
+
+    # Relative expressions a controller actually types. Unbound, these were
+    # not refusals -- they were answers to a wider question than the one asked:
+    # "licence expires in the next 30 days" returned all 600 certificates, and
+    # "depart DEL this afternoon" returned the whole week. Both read as
+    # answers. The brief's own Tier 1 examples are phrased exactly this way.
+    ql = question.lower()
+    today = snap.horizon[0]
+
+    m = re.search(r"next\s+(\d{1,3})\s*(day|week|month)", ql)
+    if m:
+        n_units = int(m.group(1))
+        days = n_units * {"day": 1, "week": 7, "month": 30}[m.group(2)]
+        put("expiring_before", (today + timedelta(days=days)).isoformat())
+        put("expiring_after", today.isoformat())
+
+    for phrase, (after, before) in (
+            ("this morning", ("00:00", "12:00")),
+            ("this afternoon", ("12:00", "18:00")),
+            ("this evening", ("18:00", "23:59")),
+            ("tonight", ("18:00", "23:59")),
+            ("overnight", ("18:00", "23:59"))):
+        if phrase in ql:
+            put("dep_after_utc", after)
+            put("dep_before_utc", before)
+            # "this afternoon" means today, not every afternoon this week.
+            put("date", today.isoformat())
+            break
 
     pairing = ents.pairings[0] if ents.pairings else None
     crew = ents.crew[0] if ents.crew else None
