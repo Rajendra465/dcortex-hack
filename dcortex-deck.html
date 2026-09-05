@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Who Flies DX412</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#0B0F13; --panel:#141A21; --panel-2:#1B222A; --line:#242D36; --hair:#1D242C;
+  --ink:#E9EEF2; --ink-2:#AFBAC4; --dim:#75828D;
+  --ok:#3FB27F; --ok-bg:#102520; --bad:#E2686A; --bad-bg:#26161A;
+  --warn:#D9A03C; --warn-bg:#241C11; --accent:#5B9BD5; --accent-bg:#111C27;
+  --disp:"IBM Plex Sans Condensed","Arial Narrow",sans-serif;
+  --sans:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:0 26px 120px}
+
+.slide{padding:64px 0 8px;border-top:1px solid var(--line)}
+.slide:first-of-type{border-top:none}
+.num{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--dim);margin-bottom:16px}
+.num b{color:var(--accent);font-weight:600}
+h1{font-family:var(--disp);font-weight:700;font-size:clamp(42px,7vw,78px);line-height:.96;letter-spacing:-.012em;margin:0 0 20px;text-wrap:balance}
+h2{font-family:var(--disp);font-weight:600;font-size:clamp(27px,4vw,42px);line-height:1.06;margin:0 0 16px;text-wrap:balance}
+h3{font-family:var(--sans);font-weight:600;font-size:15px;margin:30px 0 10px}
+p{margin:0 0 15px;max-width:70ch}
+.lede{font-size:clamp(17px,2.1vw,20px);line-height:1.5;color:var(--ink-2);max-width:62ch}
+.dim{color:var(--dim)}
+strong{font-weight:600}
+.m,code{font-family:var(--mono);font-size:.88em}
+code{background:var(--panel-2);padding:1px 6px;border-radius:3px;color:var(--ink-2)}
+
+.case{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:22px 0}
+.case-q{padding:13px 18px;background:var(--panel-2);border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:13.5px;color:var(--ink);line-height:1.6}
+.case-q i{font-style:normal;color:var(--dim);display:block;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;margin-bottom:5px}
+.row{display:grid;grid-template-columns:118px minmax(0,1fr);gap:0 16px;padding:12px 18px;border-top:1px solid var(--hair);font-size:14.5px}
+.row:first-of-type{border-top:none}
+.row .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding-top:3px}
+.row .v{line-height:1.55}
+.tick{color:var(--ok)}.cross{color:var(--bad)}.warnc{color:var(--warn)}
+
+.pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.pill{font-family:var(--mono);font-size:11.5px;padding:2px 9px;border-radius:4px;background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line)}
+.pill.bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.pill.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel);margin:20px 0}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+th,td{text-align:left;padding:11px 15px;border-bottom:1px solid var(--hair);vertical-align:top}
+thead th{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);background:var(--panel-2);border-bottom:1px solid var(--line)}
+tbody tr:last-child td{border-bottom:none}
+td.n{font-family:var(--mono);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:22px 0}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:16px 18px}
+.stat .big{font-family:var(--disp);font-size:34px;font-weight:700;line-height:1;margin-bottom:5px}
+.stat .lbl{font-size:12.5px;color:var(--dim);line-height:1.4}
+.stat.ok .big{color:var(--ok)}.stat.bad .big{color:var(--bad)}.stat.warn .big{color:var(--warn)}.stat.acc .big{color:var(--accent)}
+
+.note{border-left:3px solid var(--accent);background:var(--accent-bg);padding:16px 20px;margin:20px 0;border-radius:0 8px 8px 0}
+.note.warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.note.bad{border-left-color:var(--bad);background:var(--bad-bg)}
+.note h4{font-size:14.5px;font-weight:600;margin:0 0 8px}
+.note p{margin:0 0 9px;font-size:14.5px}.note p:last-child{margin:0}
+
+.say{font-family:var(--disp);font-size:clamp(20px,3vw,29px);font-weight:600;line-height:1.24;
+  color:var(--ink);border-left:3px solid var(--line);padding-left:20px;margin:24px 0;max-width:27ch}
+
+ul{margin:0 0 16px;padding-left:20px;max-width:70ch}li{margin-bottom:8px}
+.foot{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.75}
+@media (max-width:640px){.row{grid-template-columns:1fr;gap:5px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<section class="slide" style="padding-top:76px">
+  <div class="num">dCortex &middot; Crew Ops Advisor</div>
+  <h1>Who flies DX412?</h1>
+  <p class="lede">It is 05:00. A captain has called in sick. Six sectors and 486 seats are without a crew, and someone has to work out &mdash; now &mdash; who is <em>allowed</em> to fly them.</p>
+  <div class="stats">
+    <div class="stat ok"><div class="big">42/0</div><div class="lbl">answer keys correct, wrong</div></div>
+    <div class="stat acc"><div class="big">204</div><div class="lbl">tests passing</div></div>
+    <div class="stat"><div class="big">1.4<span style="font-size:18px">ms</span></div><div class="lbl">per legality check</div></div>
+    <div class="stat warn"><div class="big">10</div><div class="lbl">languages a callout can go out in</div></div>
+  </div>
+  <p class="dim" style="font-size:14px">147 flights &middot; 150 crew &middot; 16 standby &middot; 39 pairings &middot; 7 days &middot; all times UTC</p>
+</section>
+
+<section class="slide">
+  <div class="num"><b>01</b> &nbsp;THE PROBLEM</div>
+  <h2>The alarm is easy. The answer is not.</h2>
+  <p>Crew Control does not struggle to notice that something broke. They struggle to work out <strong>what breaks next</strong>, and who can legally be moved to cover it &mdash; across a roster, seven duty clocks, licence expiries, aircraft ratings, base rules and a standby list.</p>
+  <p>And it is arithmetic, not judgement. A pilot may work 60 hours in any 7 days. Covering this trip puts Captain C-2087 on <strong>61 hours 20 minutes</strong>. That is 2% over. In aviation 2% over is not "close enough" &mdash; it is illegal.</p>
+  <div class="say">A nearly-right answer is not a slightly worse answer. It is a violation.</div>
+</section>
+
+<section class="slide">
+  <div class="num"><b>02</b> &nbsp;THE ARCHITECTURE</div>
+  <h2>The model does the talking. Code does the deciding.</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Layer</th><th>What it does</th><th>What it may never do</th></tr></thead>
+    <tbody>
+      <tr><td class="n">Language model</td><td>Turn a sentence into a typed query. Write the answer back in plain English.</td><td>Compute. Rank. Decide legality.</td></tr>
+      <tr><td class="n">Kernel</td><td>Every number. All seven rules. Cost, ranking, legality.</td><td>Guess. It has no fallback.</td></tr>
+      <tr><td class="n">Guard</td><td>Reads the finished sentence back against the ledger.</td><td>Let an unbacked figure reach the screen.</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>The model never sees a raw duty clock.</strong> It only ever sees figures the kernel already produced, so it cannot get the arithmetic wrong &mdash; it never sees the arithmetic. Delete the model entirely and the system still answers 42 of 42 correctly.</p>
+</section>
+
+<section class="slide">
+  <div class="num"><b>03</b> &nbsp;CASE ONE &middot; LOOKUP</div>
+  <h2>A question with an answer in the data</h2>
+  <div class="case">
+    <div class="case-q"><i>Controller types</i>How many duty hours does C-1042 have left this week?</div>
+    <div class="row"><span class="k">Runs</span><span class="v"><code>duty_hours</code> &mdash; a windowed sum over the duty clock</span></div>
+    <div class="row"><span class="k">Answers</span><span class="v">20.93h used over the 7 days ending 2026-09-14. <strong>39.07h of headroom</strong> against the 60h ceiling.</span></div>
+    <div class="row"><span class="k">Checks</span><span class="v"><span class="pills"><span class="pill ok">12 ran</span><span class="pill">6 gates passed</span><span class="pill">0 ruled out</span></span></span></div>
+    <div class="row"><span class="k">How</span><span class="v">Deterministic. Every figure traces to <code>duty_clocks.json</code>, and the guard checks each one appears in the ledger before the sentence renders.</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="num"><b>04</b> &nbsp;CASE TWO &middot; CONSEQUENCE</div>
+  <h2>A question whose answer is arithmetic against a rulebook</h2>
+  <div class="case">
+    <div class="case-q"><i>Controller types</i>If I move FO C-2087 onto DX412, does anyone breach a duty limit?</div>
+    <div class="row"><span class="k">Answers</span><span class="v"><span class="cross">&#10007; NOT LEGAL</span> &mdash; C-2087 cannot cover P-2291.</span></div>
+    <div class="row"><span class="k">Because</span><span class="v"><code>RULE-DUTY-02</code>: would exceed 60h/7d by <strong>1h20m</strong> on 2026-09-15 (total 61.33h), and again by 1h05m on 16 Sep.</span></div>
+    <div class="row"><span class="k">Rules</span><span class="v"><span class="pills"><span class="pill ok">FDP-01</span><span class="pill ok">FLT-03</span><span class="pill ok">REST-04</span><span class="pill ok">QUAL-05</span><span class="pill ok">CERT-06</span><span class="pill ok">BASE-07</span><span class="pill bad">DUTY-02</span></span></span></div>
+    <div class="row"><span class="k">How</span><span class="v">All seven rules evaluated independently. The badge that fails names the rule, the margin and the date &mdash; arithmetic a controller can check in two seconds.</span></div>
+  </div>
+  <div class="note warn">
+    <h4>A delay breaks tomorrow, not just today</h4>
+    <p>Delay P-2291 by <strong>0.50h</strong> and the duty still fits &mdash; 12.00h rest remains, exactly legal. Delay it by <strong>0.51h</strong> and six crew (C-1042, C-1694, C-3005, C-4395, C-4273, C-1873) have 11.99h before they report for day two.</p>
+    <p>The duty is still 2.5 hours <em>inside</em> its own FDP limit when rest breaks. We said "still legal" about that morning until we found it.</p>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="num"><b>05</b> &nbsp;CASE THREE &middot; RECOMMENDATION</div>
+  <h2>Ranked options, and who we ruled out</h2>
+  <div class="case">
+    <div class="case-q"><i>Controller types</i>Captain C-1042 is out &mdash; what should I do?</div>
+    <div class="row"><span class="k">Breaks</span><span class="v">6 sectors uncrewed across two days <span class="pills"><span class="pill bad">DX412</span><span class="pill bad">DX413</span><span class="pill bad">DX588</span><span class="pill bad">DX589</span><span class="pill bad">DX590</span><span class="pill bad">DX591</span></span></span></div>
+    <div class="row"><span class="k">Screened</span><span class="v"><strong>28 captains against all 7 rules. 6 legal.</strong> 22 ruled out, each with the arithmetic.</span></div>
+    <div class="row"><span class="k">Recommends</span><span class="v"><span class="tick">&#10003;</span> <strong>C-3310</strong> &mdash; reserve callout, BLR-based, A320-rated, on call 06:00&ndash;18:00Z, reachable in 45 min. <strong>&#8377;18,500</strong></span></div>
+    <div class="row"><span class="k">Against</span><span class="v">Next legal option &#8377;24,000 &middot; deadhead from DEL &#8377;41,200 &middot; <strong>cancelling is &#8377;2,50,000 per sector</strong></span></div>
+  </div>
+  <p><strong>The differentiator is the 22 we rejected.</strong> A controller's first question is always "why not someone else?" &mdash; and every rejection here is a rule ID, a margin and a date.</p>
+</section>
+
+<section class="slide">
+  <div class="num"><b>06</b> &nbsp;CASE FOUR &middot; ACTION</div>
+  <h2>Authorising changes the world, and says what it cost</h2>
+  <p>Until recently this raised a toast and changed nothing. The roster still showed the trip uncrewed, and the next question was answered in a world where the decision had never been taken &mdash; which is how an advisor offers the same reserve twice.</p>
+  <div class="case">
+    <div class="case-q"><i>Controller clicks</i>Authorise C-3310 &rarr; P-2291</div>
+    <div class="row"><span class="k">Before</span><span class="v">captain on P-2291 = <code>C-1042</code></span></div>
+    <div class="row"><span class="k">After</span><span class="v">captain on P-2291 = <code>C-3310</code> &mdash; ask the same question again and you get the new answer</span></div>
+    <div class="row"><span class="k">Cost</span><span class="v">Sectors crewed <span class="tick">yes</span> &middot; C-3310 <strong>+2 duty days</strong> &middot; removed from standby<br><strong class="warnc">Hours with no standby captain: 32 &rarr; 35</strong></span></div>
+    <div class="row"><span class="k">How</span><span class="v">The assignment is an event on the same overlay as any what-if: visible, reversible with Reset, and every later answer is computed inside it.</span></div>
+  </div>
+  <div class="say">Covering today by spending your only evening reserve is a real cost. Nothing on the desk used to say so.</div>
+</section>
+
+<section class="slide">
+  <div class="num"><b>07</b> &nbsp;CASE FIVE &middot; REFUSAL</div>
+  <h2>Four ways to say no, and they are not the same no</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Asked</th><th>Answer</th><th>Why it is a different refusal</th></tr></thead>
+    <tbody>
+      <tr><td>"What is C-3310's phone number?"</td><td class="n">Not held</td><td>We hold rosters, not contact details. We list what we <em>do</em> hold.</td></tr>
+      <tr><td>"Will C-2087 call in sick tomorrow?"</td><td class="n">Not ours</td><td>That is a prediction. The risk score was handed to us; we say where it came from.</td></tr>
+      <tr><td>"Who is on reserve on 2026-10-05?"</td><td class="n">Past horizon</td><td>The roster stops on 20 Sep. Beyond it we cannot verify, so we do not claim.</td></tr>
+      <tr><td>"Tell me about C-9999"</td><td class="n">No such crew</td><td>We never resolve to the nearest match. An invented crew member is a failure, not a rounding error.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Each refusal names what would make it answerable. <strong>"I don't hold that" and "I didn't understand you" are different problems</strong>, and a tool that hides confusion behind polite humility gets caught the first time you rephrase.</p>
+</section>
+
+<section class="slide">
+  <div class="num"><b>08</b> &nbsp;CASE SIX &middot; THE CALLOUT</div>
+  <h2>The message goes out in the language they read</h2>
+  <p>A callout is the one thing on this desk that leaves the building, and an Indian carrier's cabin crew do not all read English equally well. Ten languages, via Sarvam.</p>
+  <div class="case">
+    <div class="case-q"><i>Drafted after authorisation &middot; Hindi</i>
+      &#2344;&#2350;&#2360;&#2381;&#2325;&#2366;&#2352; &#2325;&#2376;&#2346;&#2381;&#2335;&#2344; &#2337;&#2368;. &#2352;&#2375;&#2337;&#2381;&#2337;&#2368;, &#2351;&#2361; &#2325;&#2381;&#2352;&#2370; &#2325;&#2306;&#2335;&#2381;&#2352;&#2379;&#2354; &#2361;&#2376;&#2404;<br>
+      DUTY: P-2291 on 2026-09-15<br>REPORT: 06:00 UTC at BLR<br>SECTORS: DX412, DX413, DX588</div>
+    <div class="row"><span class="k">Translated</span><span class="v">the wording only</span></div>
+    <div class="row"><span class="k">Never</span><span class="v">the trip, the station, the sectors or the Zulu time</span></div>
+    <div class="row"><span class="k">Why</span><span class="v">Measured. Shielding identifiers with markers lost <strong>DX412/413/588 in Hindi, Bengali and Marathi</strong>, inconsistently. Two parts made the guarantee structural: <strong>7/7 identifiers intact</strong>, up from 5/7.</span></div>
+  </div>
+  <div class="note">
+    <h4>Why this is safe when nothing else model-written would be</h4>
+    <p>Every figure in a callout is computed by the kernel and passed by the number guard <em>before</em> Sarvam sees it. Translation re-says a verified sentence &mdash; it cannot invent a report time. It is also how aviation already works: identifiers stay in standard form on every flight deck, in every language.</p>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="num"><b>09</b> &nbsp;HOW IT DECIDES</div>
+  <h2>Twelve checks, six of which can stop the question dead</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Check</th><th>Screens for</th><th>On failure</th></tr></thead>
+    <tbody>
+      <tr><td class="n">Scope screen</td><td>Is this Crew Control work, on data we hold?</td><td>Refuse, naming what we hold</td></tr>
+      <tr><td class="n">Roster window</td><td>Do the dates fall inside the published week?</td><td>Refuse with the range</td></tr>
+      <tr><td class="n">Crew on strength</td><td>Is this crew number on the roster?</td><td>Refuse &mdash; never the nearest match</td></tr>
+      <tr><td class="n">Request classifier</td><td>Which capability answers this</td><td>14 scored, the losers recorded</td></tr>
+      <tr><td class="n">Query builder</td><td>Two planners; the validator arbitrates</td><td>Disagreement is shown, not resolved silently</td></tr>
+      <tr><td class="n">Query validator</td><td>Every field bound before a figure is read</td><td>Ask for the missing argument</td></tr>
+      <tr><td class="n">Legality engine</td><td>The seven rules against the roster</td><td>&mdash; this is where numbers are born</td></tr>
+      <tr><td class="n">Crew screening</td><td>Every candidate against all seven rules</td><td>Each rejection carries its arithmetic</td></tr>
+      <tr><td class="n">Figure audit</td><td>Every number in the sentence traced to source</td><td><strong>Block the answer</strong></td></tr>
+    </tbody>
+  </table></div>
+  <p>Collapsed, that is one line: <span class="m">12 checks ran &middot; 6 passed &middot; 22 ruled out</span>. Opened, each carries what it found, the figures it decided from, and its own timing. <strong>No model judges another model anywhere in this chain</strong> &mdash; intrinsic self-correction without external ground truth measurably degrades reasoning, so every model output is checked by code that never saw the prose.</p>
+</section>
+
+<section class="slide">
+  <div class="num"><b>10</b> &nbsp;WHAT WE FOUND IN OUR OWN WORK</div>
+  <h2>42 of 42 &mdash; and three of the brief's own questions came back wrong</h2>
+  <p>The brief says submissions may be run against held-out scenarios. So we ran the eight example questions printed in the brief, verbatim, through the natural-language layer. None is in the shipped question set. We scored 42/42 on the shipped set and <strong>3 of these 8 were confidently wrong</strong>.</p>
+  <div class="tw"><table>
+    <thead><tr><th>The brief's question</th><th>What came back</th><th>Fault</th></tr></thead>
+    <tbody>
+      <tr><td>"just called in sick &mdash; which flights are now uncrewed?"</td><td class="n" style="color:var(--bad)">a list of standby crew</td><td><code>"on call"</code> reduces to one token, so <em>"called"</em> matched a reserve listing at a perfect score</td></tr>
+      <tr><td>"licence expires in the next 30 days"</td><td class="n" style="color:var(--bad)">all 600 certificates</td><td>"next 30 days" bound nothing &mdash; not a refusal, an answer to a wider question</td></tr>
+      <tr><td>"which flights depart DEL this afternoon?"</td><td class="n" style="color:var(--bad)">the whole week, duplicated</td><td>same &mdash; "this afternoon" bound no time window</td></tr>
+    </tbody>
+  </table></div>
+  <p>All three now pass, and the fixes are in the routing layer rather than in special cases. The licence question returns the <strong>6</strong> certificates actually expiring; the flights question returns <strong>0</strong>, which is true &mdash; DEL's only departures on 14 Sep are 05:00 and 06:00.</p>
+  <div class="say">Three wrong is exactly what the brief says loses to ten right and one honest refusal.</div>
+</section>
+
+<section class="slide">
+  <div class="num"><b>11</b> &nbsp;HONEST LIMITS</div>
+  <h2>Where it stops, and what it says when it gets there</h2>
+  <ul>
+    <li><strong>One week only.</strong> The roster ends 2026-09-20. Rest before a trip on the 21st is unverifiable, so we say "legal within the week we can see" rather than claim a certainty we do not have.</li>
+    <li><strong>Two simultaneous disruptions, handled.</strong> Three or more we still return a legal plan for &mdash; we just stop calling it the best one.</li>
+    <li><strong>Crew only.</strong> No aircraft swaps, no passenger rebooking, no hotels. Real parts of the job, deliberately out of scope.</li>
+    <li><strong>"Passengers" means seats.</strong> The data has aircraft capacity, not bookings. 486 is 486 seats, and we say so.</li>
+    <li><strong>Seven rules is the whole scope.</strong> Not DGCA CAR Section 7 &mdash; seven simplified rules, and the UI says that rather than claiming conformance to a regulation many times larger.</li>
+  </ul>
+  <div class="note bad">
+    <h4>The correction we are keeping visible</h4>
+    <p>An earlier version of this deck claimed the FDP boundary rested on a single witness record. Two independent sweeps found <strong>no exact FDP ties in the roster at all</strong>. The claim is withdrawn. What replaced it is stronger and verified: of 206 rostered assignments, 200 depart from the crew member's own base &mdash; and the six that do not are one trip, P-2289, whose entire crew reports at DEL while based at BLR.</p>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="num"><b>12</b> &nbsp;CLOSE</div>
+  <h2>Fast because it is code. Right because it is checked. Trusted because it says when it is not sure.</h2>
+  <div class="stats">
+    <div class="stat ok"><div class="big">0</div><div class="lbl">wrong answers against the shipped keys</div></div>
+    <div class="stat acc"><div class="big">204</div><div class="lbl">tests, including the brief's own questions</div></div>
+    <div class="stat"><div class="big">93<span style="font-size:18px">ms</span></div><div class="lbl">to replay all 272 legality assertions</div></div>
+    <div class="stat warn"><div class="big">22</div><div class="lbl">crew ruled out, each with its arithmetic</div></div>
+  </div>
+  <p>The brief asked for the advisor a real crew controller would want beside them at 6 a.m. on a bad day. At 6 a.m. you do not want something clever. You want the answer, the sum behind it, who else you could have called &mdash; and an honest no when the question is one it cannot take.</p>
+  <div class="say">We did not teach a model to do arithmetic. We taught it when to stop talking and let the calculator answer.</div>
+</section>
+
+<p class="foot">
+Every figure recorded from the running system against the shipped synthetic dataset. 42 correct / 0 wrong / 6 hand-graded, 204 tests passing. C-2087 at 61.33h against a 60h ceiling; P-2291 rest cliff at 0.50h &rarr; 0.51h affecting six crew; 28 captains screened with 6 legal; standby gap 32 &rarr; 35 hours after authorising C-3310; 7/7 identifiers preserved across Hindi, Tamil, Bengali and Marathi. Kernel 1.4 ms per legality check, 272 assertions replayed in 93 ms.
+</p>
+
+</div>
+
+</body>
+</html>
