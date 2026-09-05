@@ -308,6 +308,7 @@ INTENTS: list[Intent] = [
         # answered as a sick call. Longer cues cannot be part-matched into a
         # false positive.
         "which flights are now uncrewed", "which flights are uncrewed now",
+        "recovery plan for this crew", "what is the recovery plan",
         "what is the crew impact", "what is affected by this",
         "which legs are now uncovered", "which sectors are now uncrewed",
         # The brief's own Tier 2 example -- "Captain C-1042 just called in sick
@@ -333,6 +334,8 @@ INTENTS: list[Intent] = [
     Intent("simulate_station_closure", [
         "station is closed", "airport shut", "closed between", "closure impact",
         "what is affected by the closure", "closed from until",
+        "recovery plan across affected pairings",
+        "outline the recovery plan", "closure recovery plan",
     ], needs=("station",), boost=1.3),
 
     Intent("simulate_delay", [
