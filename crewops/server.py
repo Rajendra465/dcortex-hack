@@ -142,6 +142,31 @@ def _reserves(snap: Snapshot) -> list[dict[str, Any]]:
     return sorted(out, key=lambda x: (x["base"], x["rank"], x["crew_id"]))
 
 
+def _callout_text(snap: Snapshot, cid: str, pid: str) -> str:
+    """The callout, built in two parts on purpose.
+
+    Prose first, then an operational block. Only the prose is ever translated;
+    identifiers, stations and Zulu times stay in standard form, which is how
+    aviation already works and the only shape that survived measurement --
+    marker-based shielding lost flight numbers in Hindi and Bengali.
+    """
+    c = snap.crew.get(cid)
+    p = snap.pairings.get(pid)
+    if not c or not p:
+        return ""
+    day = p.days[0]
+    legs = ", ".join(f.split("-2026")[0] for f in day.flights)
+    dep = snap.flights[day.flights[0]].dep_station if day.flights else c.base
+    return (
+        f"Hello {c.rank} {c.name}, this is Crew Control.\n"
+        f"You have been assigned to cover a trip. Please confirm you can accept it.\n"
+        f"DUTY: {pid} on {day.date}\n"
+        f"REPORT: {day.report:%H:%M} UTC at {dep}\n"
+        f"SECTORS: {legs}\n"
+        f"Reply CONFIRM to accept, or call the desk."
+    )
+
+
 def _outreach(snap: Snapshot, data: dict[str, Any]) -> dict[str, Any]:
     cid = data.get("crew_id", "C-3310")
     pid = data.get("pairing_id", "P-2291")
@@ -473,7 +498,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         route = self.path.split("?")[0]
         if route not in ("/api/ask", "/api/whatif", "/api/reset", "/api/set_region",
-                         "/api/resolve_event", "/api/commit"):
+                         "/api/resolve_event", "/api/commit", "/api/outreach"):
             self._json({"error": "not found"}, 404)
             return
         try:
@@ -674,7 +699,30 @@ class Handler(BaseHTTPRequestHandler):
             if route == "/api/outreach":
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")
-                self._json(_outreach(snap, body))
+                out = _outreach(snap, body)
+                # Sarvam is optional and never on the path of a legality
+                # answer. Without a key the callout is English, as before.
+                lang = str(body.get("language") or "en-IN")
+                want_audio = bool(body.get("audio"))
+                try:
+                    from . import sarvam
+                    out["sarvam"] = sarvam.status()
+                    if sarvam.available():
+                        base = _callout_text(snap, body.get("crew_id", ""),
+                                             body.get("pairing_id", ""))
+                        if base:
+                            out["callout_en"] = base
+                            out["callout"] = (sarvam.translate(base, lang)
+                                              if lang != "en-IN" else base)
+                            out["language"] = lang
+                            if want_audio:
+                                out["audio"] = sarvam.speak(out["callout"], lang)
+                except Exception as e:
+                    # Say what failed. A controller must never think a crew
+                    # member was written to in their own language when they
+                    # were not.
+                    out["sarvam_error"] = str(e)
+                self._json(out)
                 return
             if route in ("/api/whatif", "/api/reset", "/api/set_region"):
                 n = int(self.headers.get("Content-Length") or 0)

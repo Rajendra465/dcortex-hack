@@ -183,6 +183,60 @@ button{font-family:inherit}
   .tstep{grid-template-columns:16px minmax(0,1fr)}
   .tstep .tval{grid-column:2}
 }
+
+/* ---- checks: each one an independent screen that ran ---- */
+.checks{border-top:1px solid var(--line)}
+.checks-h{padding:9px 16px;font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--dim);cursor:pointer;display:flex;align-items:center;gap:9px;user-select:none}
+.checks-h .car{transition:transform .18s;display:inline-block;font-size:10px}
+.checks.open .checks-h .car{transform:rotate(90deg)}
+.checks-h .sum{margin-left:auto;display:flex;gap:6px;text-transform:none;letter-spacing:0;
+  font-family:var(--mono);font-size:11px}
+.checks-b{display:none;padding:4px 0 8px}
+.checks.open .checks-b{display:block}
+.chk{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:0 11px;padding:8px 16px;
+  border-top:1px solid var(--hair);font-size:12.5px;align-items:start;
+  animation:chkIn .22s cubic-bezier(.22,1,.36,1) both}
+@keyframes chkIn{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
+.chk .mark{width:17px;height:17px;border-radius:4px;display:grid;place-items:center;
+  font-size:10px;font-weight:700;margin-top:1px;background:var(--panel-2);
+  border:1px solid var(--line);color:var(--dim)}
+.chk.pass .mark{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.chk.stop .mark{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.chk-name{font-weight:600}
+.chk-what{color:var(--dim);font-size:11px;display:block;margin-top:1px}
+.chk-found{color:var(--ink-2);margin-top:5px;line-height:1.45;display:block}
+.chk-ms{font-family:var(--mono);font-size:10.5px;color:var(--dim);white-space:nowrap;padding-top:2px}
+.chk-data{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.chk-data span{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:3px;
+  background:var(--panel-2);color:var(--ink-2)}
+.chk-data b{color:var(--ink);margin-right:4px}
+.chk-data span.win{background:var(--ok-bg);color:var(--ok)}
+
+/* ---- dismissable disruptions ---- */
+.scn{position:relative}
+.scn .x{position:absolute;top:3px;right:5px;width:16px;height:16px;border-radius:4px;border:none;
+  background:transparent;color:var(--dim);cursor:pointer;font-size:14px;line-height:1;padding:0;display:none}
+.scn:hover .x{display:block}
+.scn .x:hover{background:var(--bad-bg);color:var(--bad)}
+.filters{display:flex;gap:5px;margin-left:auto;text-transform:none;letter-spacing:0;flex-wrap:wrap}
+.filt{font-size:11px;padding:3px 9px;border-radius:11px;cursor:pointer;
+  border:1px solid var(--line);background:transparent;color:var(--dim)}
+.filt.on{border-color:var(--accent);color:var(--ink);background:var(--accent-bg)}
+
+/* ---- callout ---- */
+.callout{border-top:1px solid var(--line);background:var(--panel-2)}
+.callout-h{padding:9px 16px;font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--dim);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.callout-h select{background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  border-radius:5px;padding:3px 7px;font-size:11.5px;font-family:inherit}
+.callout-h button{background:none;border:1px solid var(--line);color:var(--ink-2);
+  border-radius:5px;padding:3px 9px;font-size:11.5px;cursor:pointer}
+.callout-h button:hover{border-color:var(--accent);color:var(--ink)}
+.callout pre{margin:0;padding:12px 16px;white-space:pre-wrap;font-family:var(--sans);
+  font-size:13.5px;line-height:1.55;color:var(--ink)}
+.callout .ops{font-family:var(--mono);font-size:12.5px}
+.callout-note{padding:0 16px 11px;font-size:11.5px;color:var(--dim);line-height:1.5}
 </style>
 </head>
 <body>
@@ -197,7 +251,14 @@ button{font-family:inherit}
 <div class="wrap">
 
   <div class="launch">
-    <div class="launch-h"><span class="live-dot" id="liveDot"></span>Disruptions</div>
+    <div class="launch-h"><span class="live-dot" id="liveDot"></span>Disruptions
+      <span class="filters">
+        <button class="filt on" onclick="filterScn(this,'all')">All</button>
+        <button class="filt" onclick="filterScn(this,'SICK_CREW')">Sick</button>
+        <button class="filt" onclick="filterScn(this,'DELAY')">Delay</button>
+        <button class="filt" onclick="filterScn(this,'STATION_CLOSURE')">Closure</button>
+        <button class="filt" onclick="filterScn(this,'CERT_EXPIRY')">Certificate</button>
+      </span></div>
     <div class="launch-b" id="scnBar"><span class="muted">loading…</span></div>
   </div>
 
@@ -222,19 +283,21 @@ const legOf = f => String(f).split('-2026')[0];
 /* ---------------------------------------------------------------- the trail
    What the advisor did, in Crew Control's words. The internal stage names
    describe how the code is built; these describe what was checked. */
+/* Each step is a separate screen that ran and could have stopped the request.
+   Named for what it checks, not for how it is implemented. */
 const TRAIL = {
-  'scope':         ['Request in scope',        'a Crew Control question about data we hold'],
-  'horizon':       ['Inside the roster period','dates fall within the published week'],
-  'entity exists': ['Crew ID on strength',     'the crew number exists on this roster'],
-  'entities':      ['Read from the request',   'crew, pairings, flights and dates identified'],
-  'route':         ['Request classified',      'which capability answers this'],
-  'planners':      ['Query built',             'turned into a typed request the kernel can run'],
-  'tool horizon':  ['Dates re-checked',        'against the coverage of that capability'],
-  'plan valid':    ['Query validated',         'every field bound before anything runs'],
-  'kernel':        ['Legality computed',       'the seven rules, against the roster'],
-  'candidates':    ['Crew screened',           'every candidate against all seven rules'],
-  'narrate':       ['Answer composed',         'written from the computed figures only'],
-  'number guard':  ['Figures traced to source','every number matched to the roster']
+  'scope':         ['Scope screen',       'is this Crew Control work, on data we hold'],
+  'horizon':       ['Roster window',      'do the dates fall inside the published week'],
+  'entity exists': ['Crew on strength',   'is this crew number actually on the roster'],
+  'entities':      ['Request reader',     'pull out crew, trips, sectors and dates'],
+  'route':         ['Request classifier', 'decide which capability answers this'],
+  'planners':      ['Query builder',      'two planners; the validator arbitrates'],
+  'tool horizon':  ['Date re-check',      'now against that capability own coverage'],
+  'plan valid':    ['Query validator',    'every field bound before a figure is read'],
+  'kernel':        ['Legality engine',    'the seven rules, computed against the roster'],
+  'candidates':    ['Crew screening',     'every candidate against all seven rules'],
+  'narrate':       ['Answer writer',      'writes only from figures already computed'],
+  'number guard':  ['Figure audit',       'every number in the sentence traced to source']
 };
 
 /* ---------------------------------------------------------------- boot */
@@ -249,7 +312,9 @@ async function boot(){
   try{
     S.scenarios = await (await fetch('/api/scenarios')).json();
     $('scnBar').innerHTML = S.scenarios.filter(x=>x.runnable).map(x =>
-      `<button class="scn" title="${esc(x.narrative)}" onclick="runScenario('${x.id}')">
+      `<button class="scn" data-kind="${esc(x.type)}" title="${esc(x.narrative)}"
+          onclick="runScenario('${x.id}')">
+         <span class="x" onclick="dismissScn(this,event)" title="Dismiss">\u00d7</span>
          <span class="k">${esc(x.id)} · ${esc(String(x.type).replace('_',' ').toLowerCase())}</span>
          <span class="t">${esc(x.title)}</span></button>`).join('');
   }catch(e){ $('scnBar').innerHTML = '<span class="muted">no scenarios</span>'; }
@@ -460,6 +525,7 @@ async function authorise(btn, crew, pairing){
     btn.closest('.card').appendChild(box);
     btn.textContent = 'Authorised';
     showWorld(d.what_if);
+    drawCallout(btn.closest('.card'), crew, pairing);
   }catch(err){
     btn.disabled=false; btn.textContent='Authorise failed — retry';
     const n = document.createElement('div');
@@ -488,37 +554,108 @@ async function resetWorld(){
 function trail(tr){
   if(!tr || !tr.stages || !tr.stages.length) return '';
   const stopped = tr.stages.find(s=>s.verdict==='block');
-  const rows = tr.stages.map(s=>{
-    const pair = TRAIL[s.name] || [s.name, ''];
+
+  const rows = tr.stages.map((s,i)=>{
+    const pair = TRAIL[s.name] || [s.name,''];
     const stop = s.verdict==='block' || s.verdict==='failed';
+
+    /* what this check actually found -- the figures it decided from */
     let data = '';
     if(s.meta){
       const bits = Object.keys(s.meta)
         .filter(k=>k!=='agreement' && s.meta[k]!==null && s.meta[k]!=='')
         .map(k=>`<span><b>${esc(k.replace(/_/g,' '))}</b>${esc(
           Array.isArray(s.meta[k])?s.meta[k].join(', '):s.meta[k])}</span>`);
-      if(bits.length) data = `<div class="tdata">${bits.join('')}</div>`;
+      if(bits.length) data += `<div class="chk-data">${bits.join('')}</div>`;
     }
-    let opts = '';
     if(s.options && s.options.length){
-      opts = `<div class="tdata">` + s.options.slice(0,5).map(o=>
-        `<span${o.chosen?' style="background:var(--ok-bg);color:var(--ok)"':''}>${esc(o.label)}${
-          o.score!==undefined?' <b style="margin:0 0 0 4px">'+o.score+'</b>':''}</span>`
+      data += `<div class="chk-data">` + s.options.slice(0,5).map(o=>
+        `<span class="${o.chosen?'win':''}">${esc(o.label)}${
+          o.score!==undefined?` <b style="margin:0 0 0 5px">${o.score}</b>`:''}</span>`
         ).join('') + `</div>`;
     }
-    return `<div class="tstep ${stop?'stop':'pass'}"><span class="tdot"></span>
-      <span><span class="tname">${esc(pair[0])}</span><span class="tsays">${esc(pair[1])}</span></span>
-      <span><span class="tval">${esc(s.detail||'')}</span>${data}${opts}</span></div>`;
+    const found = s.detail || (stop ? 'stopped the request here' : 'passed');
+    return `<div class="chk ${stop?'stop':'pass'}" style="animation-delay:${Math.min(i,10)*35}ms">
+      <span class="mark">${stop?'\u2715':'\u2713'}</span>
+      <span><span class="chk-name">${esc(pair[0])}</span>
+        <span class="chk-what">${esc(pair[1])}</span>
+        <span class="chk-found">${esc(found)}</span>${data}</span>
+      <span class="chk-ms">${s.ms} ms</span></div>`;
   }).join('');
+
   const stopName = stopped ? (TRAIL[stopped.name]||[stopped.name])[0] : '';
-  return `<div class="trail" onclick="this.classList.toggle('open')">
-      <div class="trail-h"><span class="car">▸</span>How this was decided
+  return `<div class="checks" onclick="this.classList.toggle('open')">
+      <div class="checks-h"><span class="car">\u25B8</span>${tr.stages.length} checks ran
         <span class="sum">
-          <span class="chip ${stopped?'bad':'ok'}">${tr.gates_passed} checks passed</span>
+          <span class="chip ${stopped?'bad':'ok'}">${tr.gates_passed} passed</span>
           ${stopped?`<span class="chip bad">stopped at ${esc(stopName)}</span>`:''}
           ${tr.options_rejected?`<span class="chip">${tr.options_rejected} ruled out</span>`:''}
         </span></div>
-      <div class="trail-b">${rows}</div></div>`;
+      <div class="checks-b">${rows}</div></div>`;
+}
+
+/* ---------------------------------------------------------------- callout */
+function drawCallout(card, crew, pairing){
+  const box = document.createElement('div');
+  box.className = 'callout';
+  box.innerHTML = `<div class="callout-h">Callout to ${esc(crew)}
+      <select onchange="reCallout(this,'${esc(crew)}','${esc(pairing)}')">
+        <option value="en-IN">English</option><option value="hi-IN">Hindi</option>
+        <option value="ta-IN">Tamil</option><option value="te-IN">Telugu</option>
+        <option value="bn-IN">Bengali</option><option value="mr-IN">Marathi</option>
+        <option value="kn-IN">Kannada</option><option value="ml-IN">Malayalam</option>
+        <option value="gu-IN">Gujarati</option><option value="pa-IN">Punjabi</option>
+      </select>
+      <button onclick="playCallout(this,'${esc(crew)}','${esc(pairing)}')">Read aloud</button>
+    </div><pre>drafting\u2026</pre>
+    <div class="callout-note">Only the wording is translated. Trip, station, sectors and Zulu
+      times stay in standard form \u2014 they mean the same on every flight deck, and
+      measurement showed a translator will quietly drop them.</div>`;
+  card.appendChild(box);
+  loadCallout(box, crew, pairing, 'en-IN');
+}
+
+async function loadCallout(box, crew, pairing, lang, audio){
+  const pre = box.querySelector('pre');
+  pre.textContent = 'drafting\u2026';
+  try{
+    const d = await (await fetch('/api/outreach',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({crew_id:crew, pairing_id:pairing,
+                           language:lang, audio:!!audio})})).json();
+    if(d.sarvam_error) throw new Error(d.sarvam_error);
+    const text = d.callout || d.callout_en || '(no draft available)';
+    pre.innerHTML = text.split('\n').map(l =>
+      /^(DUTY|REPORT|SECTORS):/.test(l) ? `<span class="ops">${esc(l)}</span>` : esc(l)
+    ).join('\n');
+    if(d.audio){ try{ new Audio(d.audio).play(); }catch(e){} }
+  }catch(err){
+    pre.innerHTML = `<span style="color:var(--bad)">${esc(err.message)}</span>\nNot sent. The English draft stands.`;
+  }
+}
+function reCallout(sel, crew, pairing){
+  loadCallout(sel.closest('.callout'), crew, pairing, sel.value);
+}
+function playCallout(btn, crew, pairing){
+  const box = btn.closest('.callout');
+  btn.textContent = 'Speaking\u2026';
+  loadCallout(box, crew, pairing, box.querySelector('select').value, true)
+    .finally(()=>{ btn.textContent = 'Read aloud'; });
+}
+
+/* ---------------------------------------------------------------- filters */
+function filterScn(btn, kind){
+  document.querySelectorAll('.filt').forEach(b=>b.classList.toggle('on', b===btn));
+  document.querySelectorAll('#scnBar .scn').forEach(el=>{
+    el.style.display = (kind==='all' || el.dataset.kind===kind) ? '' : 'none';
+  });
+}
+function dismissScn(btn, ev){
+  ev.stopPropagation();
+  const el = btn.closest('.scn');
+  el.style.transition = 'opacity .15s';
+  el.style.opacity = '0';
+  setTimeout(()=>el.remove(), 150);
 }
 
 boot();
