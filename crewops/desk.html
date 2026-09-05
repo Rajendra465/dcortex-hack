@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crew Control · dCortex Air</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   Crew Control desk.
+
+   One column. A controller at 5 a.m. reads top to bottom and does not hunt
+   through panels. Everything on screen is either the disruption, the answer,
+   or the arithmetic behind it -- there is no third category.
+   ========================================================================== */
+:root{
+  --bg:#0E1215; --panel:#161B20; --panel-2:#1C2228; --line:#262D34; --hair:#1F252B;
+  --ink:#E8ECEF; --ink-2:#AEB8C0; --dim:#78838C;
+  --ok:#3FB27F; --ok-bg:#12291F;
+  --bad:#E2686A; --bad-bg:#2A1618;
+  --warn:#D9A03C; --warn-bg:#291F10;
+  --accent:#5B9BD5; --accent-bg:#141E29;
+  --sans:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --bg:#F3F5F6; --panel:#FFFFFF; --panel-2:#EDF0F2; --line:#DBE0E4; --hair:#E7EBEE;
+    --ink:#12181C; --ink-2:#41505A; --dim:#6B7883;
+    --ok:#1D7A55; --ok-bg:#E4F2EB; --bad:#B03B3D; --bad-bg:#FAE9E9;
+    --warn:#8A6112; --warn-bg:#FBF1DC; --accent:#2C6DA8; --accent-bg:#E6EFF7;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ---- top bar ---- */
+.top{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:14px;padding:10px 20px;flex-wrap:wrap}
+.brand{font-weight:700;letter-spacing:-.01em}
+.brand span{color:var(--dim);font-weight:400;margin-left:8px;font-size:13px}
+.stats{margin-left:auto;display:flex;gap:16px;font-family:var(--mono);font-size:12px;color:var(--dim);flex-wrap:wrap}
+.stats b{color:var(--ink);font-weight:600}
+.btn-reset{background:none;border:1px solid var(--line);color:var(--ink-2);border-radius:6px;
+  padding:5px 11px;font-size:12px;cursor:pointer}
+.btn-reset:hover{border-color:var(--accent);color:var(--ink)}
+
+/* ---- world banner: what-ifs currently stacked ---- */
+.world{display:none;padding:8px 20px;background:var(--warn-bg);border-bottom:1px solid var(--line);
+  font-size:13px;color:var(--ink)}
+.world.on{display:block}
+.world b{font-family:var(--mono);font-size:12px}
+
+.wrap{max-width:940px;margin:0 auto;padding:18px 20px 90px}
+
+/* ---- disruption launcher ---- */
+.launch{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.launch-h{padding:11px 16px;border-bottom:1px solid var(--line);font-size:12px;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--dim);display:flex;align-items:center;gap:9px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--warn)}
+.live-dot.on{animation:pulse 1.7s infinite}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+.launch-b{display:flex;flex-wrap:wrap;gap:7px;padding:13px 16px}
+.scn{display:flex;flex-direction:column;gap:2px;text-align:left;cursor:pointer;padding:8px 12px;
+  border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--ink);min-width:150px}
+.scn:hover{border-color:var(--accent)}
+.scn:disabled{opacity:.45;cursor:default}
+.scn .k{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em}
+.scn .t{font-size:13px;font-weight:500;line-height:1.3}
+.scn.live{border-color:var(--warn);background:var(--warn-bg)}
+
+/* ---- ask ---- */
+.ask{display:flex;gap:8px;margin-bottom:16px}
+.ask input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:11px 14px;color:var(--ink);font-size:14px;font-family:inherit}
+.ask input:focus{border-color:var(--accent);outline:none}
+.ask button{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:0 18px;
+  font-weight:600;font-size:14px;cursor:pointer}
+.ask button:disabled{opacity:.5;cursor:default}
+.hints{display:flex;flex-wrap:wrap;gap:6px;margin:-8px 0 18px}
+.hint{font-size:12px;padding:4px 10px;border-radius:12px;cursor:pointer;
+  border:1px solid var(--line);background:transparent;color:var(--dim)}
+.hint:hover{border-color:var(--accent);color:var(--ink)}
+.hint.refuse{border-style:dashed}
+
+/* ---- cards ---- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  margin-bottom:14px;overflow:hidden;animation:rise .28s cubic-bezier(.22,1,.36,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.q{padding:11px 16px;background:var(--panel-2);border-bottom:1px solid var(--line);
+  font-size:13.5px;font-weight:500}
+.q .tag{font-family:var(--mono);font-size:10.5px;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.09em;display:block;margin-bottom:3px}
+
+/* ---- the four steps ---- */
+.step{display:grid;grid-template-columns:24px minmax(0,1fr);gap:0 13px;padding:13px 16px;
+  border-top:1px solid var(--hair);position:relative}
+.step:first-of-type{border-top:none}
+.step::before{content:"";position:absolute;left:26px;top:32px;bottom:-13px;width:1px;background:var(--line)}
+.step:last-of-type::before{display:none}
+.n{width:19px;height:19px;border-radius:50%;display:grid;place-items:center;margin-top:2px;
+  font-family:var(--mono);font-size:10.5px;font-weight:700;background:var(--panel-2);
+  border:1px solid var(--line);color:var(--dim)}
+.step.ok .n{background:var(--ok);border-color:var(--ok);color:#04140D}
+.step.bad .n{background:var(--bad);border-color:var(--bad);color:#1A0708}
+.step.warn .n{background:var(--warn);border-color:var(--warn);color:#180F02}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);margin-bottom:4px}
+.val{font-size:14px;line-height:1.5}
+.val .sub{color:var(--ink-2)}
+
+.legs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;align-items:center}
+.leg{font-family:var(--mono);font-size:11.5px;padding:2px 8px;border-radius:4px;
+  background:var(--bad-bg);color:var(--bad);border:1px solid var(--bad)}
+.legs .day{font-family:var(--mono);font-size:11px;color:var(--dim)}
+
+/* ---- crew options ---- */
+.opt{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:11px;align-items:baseline;
+  padding:8px 0;border-top:1px dashed var(--hair);font-size:13.5px}
+.opt:first-of-type{border-top:none;padding-top:4px}
+.opt .rk{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.opt .who b{font-family:var(--mono);font-weight:600}
+.opt .why{color:var(--dim);font-size:12.5px}
+.opt .inr{font-family:var(--mono);font-weight:600;white-space:nowrap;font-size:13px}
+.opt.pick .inr{color:var(--ok)}
+.opt.out .who b{color:var(--dim);text-decoration:line-through;text-decoration-color:var(--bad)}
+
+.act{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn-go{background:var(--ok);border:none;color:#04140D;border-radius:7px;padding:8px 15px;
+  font-weight:600;font-size:13px;cursor:pointer}
+.btn-go:hover{filter:brightness(1.1)}
+.btn-go:disabled{opacity:.5;cursor:default}
+.act .cost-note{font-size:12px;color:var(--dim)}
+
+/* ---- consequences ---- */
+.after{border-top:1px solid var(--line);background:var(--ok-bg)}
+.after-h{padding:10px 16px;font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--ok);font-weight:700}
+.crow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:8px 16px;
+  border-top:1px solid var(--hair);font-size:13.5px;align-items:baseline}
+.crow .cl{color:var(--ink-2)}
+.crow .cv{font-family:var(--mono);font-weight:600;white-space:nowrap}
+.crow .cv.worse{color:var(--warn)}
+.crow .cv.good{color:var(--ok)}
+.cnote{padding:10px 16px;border-top:1px solid var(--hair);font-size:12.5px;color:var(--ink-2);line-height:1.55}
+
+/* ---- how we got here ---- */
+.trail{border-top:1px solid var(--line)}
+.trail-h{padding:9px 16px;font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--dim);cursor:pointer;display:flex;align-items:center;gap:9px;user-select:none}
+.trail-h .car{transition:transform .18s;display:inline-block;font-size:10px}
+.trail.open .trail-h .car{transform:rotate(90deg)}
+.trail-h .sum{margin-left:auto;display:flex;gap:6px;text-transform:none;letter-spacing:0;font-family:var(--mono);font-size:11px}
+.chip{padding:2px 8px;border-radius:10px;background:var(--panel-2);color:var(--ink-2)}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}
+.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.trail-b{display:none;padding:2px 0 8px}
+.trail.open .trail-b{display:block}
+.tstep{display:grid;grid-template-columns:16px 190px minmax(0,1fr);gap:0 11px;padding:7px 16px;
+  border-top:1px solid var(--hair);font-size:12.5px;align-items:start}
+.tdot{width:8px;height:8px;border-radius:50%;margin-top:5px;background:var(--dim)}
+.tstep.pass .tdot{background:var(--ok)}
+.tstep.stop .tdot{background:var(--bad)}
+.tname{font-weight:600;font-size:12.5px}
+.tsays{color:var(--dim);font-size:11px;display:block;margin-top:1px}
+.tval{color:var(--ink-2);line-height:1.45}
+.tdata{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.tdata span{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:3px;
+  background:var(--panel-2);color:var(--ink-2)}
+.tdata b{color:var(--ink);margin-right:4px}
+
+.muted{color:var(--dim)}
+.thinking{display:inline-flex;gap:4px;align-items:center;padding:14px 16px;color:var(--dim);font-size:13.5px}
+.thinking i{width:5px;height:5px;border-radius:50%;background:var(--accent);display:block;animation:bl 1.2s infinite}
+.thinking i:nth-child(2){animation-delay:.15s}
+.thinking i:nth-child(3){animation-delay:.3s}
+@keyframes bl{0%,80%,100%{opacity:.25}40%{opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:620px){
+  .tstep{grid-template-columns:16px minmax(0,1fr)}
+  .tstep .tval{grid-column:2}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand">Crew Control<span>dCortex Air · all times UTC</span></div>
+  <div class="stats" id="stats"><span class="muted">loading…</span></div>
+  <button class="btn-reset" onclick="resetWorld()">Reset</button>
+</div>
+<div class="world" id="world"></div>
+
+<div class="wrap">
+
+  <div class="launch">
+    <div class="launch-h"><span class="live-dot" id="liveDot"></span>Disruptions</div>
+    <div class="launch-b" id="scnBar"><span class="muted">loading…</span></div>
+  </div>
+
+  <div class="ask">
+    <input id="q" placeholder="Ask about crew, rosters, duty hours or a disruption"
+           onkeydown="if(event.key==='Enter')ask()">
+    <button id="send" onclick="ask()">Ask</button>
+  </div>
+  <div class="hints" id="hints"></div>
+
+  <div id="feed"></div>
+</div>
+
+<script>
+const S = {session:'desk-' + Math.floor(Date.now()/1000), scenarios:[], busy:false};
+const $ = id => document.getElementById(id);
+const esc = t => String(t==null?'':t).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const inr = n => 'INR ' + Number(n).toLocaleString('en-IN');
+const legOf = f => String(f).split('-2026')[0];
+
+/* ---------------------------------------------------------------- the trail
+   What the advisor did, in Crew Control's words. The internal stage names
+   describe how the code is built; these describe what was checked. */
+const TRAIL = {
+  'scope':         ['Request in scope',        'a Crew Control question about data we hold'],
+  'horizon':       ['Inside the roster period','dates fall within the published week'],
+  'entity exists': ['Crew ID on strength',     'the crew number exists on this roster'],
+  'entities':      ['Read from the request',   'crew, pairings, flights and dates identified'],
+  'route':         ['Request classified',      'which capability answers this'],
+  'planners':      ['Query built',             'turned into a typed request the kernel can run'],
+  'tool horizon':  ['Dates re-checked',        'against the coverage of that capability'],
+  'plan valid':    ['Query validated',         'every field bound before anything runs'],
+  'kernel':        ['Legality computed',       'the seven rules, against the roster'],
+  'candidates':    ['Crew screened',           'every candidate against all seven rules'],
+  'narrate':       ['Answer composed',         'written from the computed figures only'],
+  'number guard':  ['Figures traced to source','every number matched to the roster']
+};
+
+/* ---------------------------------------------------------------- boot */
+async function boot(){
+  try{
+    const h = await (await fetch('/api/health')).json();
+    $('stats').innerHTML =
+      `<span><b>${h.flights}</b> flights</span><span><b>${h.crew}</b> crew</span>` +
+      `<span><b>${h.reserves}</b> standby</span><span><b>7</b> rules</span>`;
+  }catch(e){ $('stats').innerHTML = '<span class="muted">offline</span>'; }
+
+  try{
+    S.scenarios = await (await fetch('/api/scenarios')).json();
+    $('scnBar').innerHTML = S.scenarios.filter(x=>x.runnable).map(x =>
+      `<button class="scn" title="${esc(x.narrative)}" onclick="runScenario('${x.id}')">
+         <span class="k">${esc(x.id)} · ${esc(String(x.type).replace('_',' ').toLowerCase())}</span>
+         <span class="t">${esc(x.title)}</span></button>`).join('');
+  }catch(e){ $('scnBar').innerHTML = '<span class="muted">no scenarios</span>'; }
+
+  try{
+    const ex = await (await fetch('/api/examples')).json();
+    const pick = t => ex.filter(e=>e.tier===t).slice(0, t==='T1'?2:1);
+    $('hints').innerHTML = [...pick('T1'),...pick('T2'),...pick('T3'),...pick('REFUSE')]
+      .map(e=>`<button class="hint${e.tier==='REFUSE'?' refuse':''}"
+        onclick="ask(this.textContent)">${esc(e.q)}</button>`).join('');
+  }catch(e){}
+
+  live();
+}
+
+/* live disruptions: an alert you can act on, not a notification you dismiss */
+function live(){
+  try{
+    const es = new EventSource('/api/stream');
+    es.onmessage = m => {
+      let d; try{ d = JSON.parse(m.data); }catch(e){ return; }
+      if(!d || !d.dynamic_event) return;
+      $('liveDot').classList.add('on');
+      const b = document.createElement('button');
+      b.className = 'scn live';
+      b.innerHTML = `<span class="k">LIVE · ${new Date().toISOString().slice(11,16)}Z</span>
+                     <span class="t">${esc(d.title||d.dynamic_event.type)}</span>`;
+      b.onclick = () => resolveEvent(d.dynamic_event, d.title || d.dynamic_event.type);
+      $('scnBar').insertBefore(b, $('scnBar').firstChild);
+      const lives = $('scnBar').querySelectorAll('.scn.live');
+      if(lives.length > 2) lives[lives.length-1].remove();
+    };
+  }catch(e){}
+}
+
+/* ---------------------------------------------------------------- cards */
+function card(tagline, question){
+  const c = document.createElement('div');
+  c.className = 'card';
+  c.innerHTML = `<div class="q"><span class="tag">${esc(tagline)}</span>${esc(question)}</div>
+                 <div class="body"><div class="thinking"><i></i><i></i><i></i>
+                 <span style="margin-left:6px">working it out…</span></div></div>`;
+  $('feed').prepend(c);
+  return c;
+}
+const step = (n,label,val,state='') =>
+  `<div class="step ${state}"><span class="n">${n}</span>
+     <span><div class="lbl">${label}</div><div class="val">${val}</div></span></div>`;
+
+/* ---------------------------------------------------------------- ask */
+async function ask(preset){
+  if(S.busy) return;
+  const el = $('q');
+  const question = (preset || el.value).trim();
+  if(!question) return;
+  el.value = '';
+  S.busy = true; $('send').disabled = true;
+  const c = card('Question', question);
+  try{
+    const a = await (await fetch('/api/ask',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({q:question, session:S.session})})).json();
+    renderAnswer(c, a);
+  }catch(err){
+    c.querySelector('.body').innerHTML =
+      step('!','Could not answer', esc(err.message), 'bad');
+  }finally{ S.busy=false; $('send').disabled=false; }
+}
+
+function renderAnswer(c, a){
+  const r = (a.result && typeof a.result==='object') ? a.result : {};
+  const refused = a.answer_type==='refusal' || a.tier==='REFUSE';
+  let html = '';
+
+  if(refused){
+    html += step('—','Not answered',
+      `${esc(a.explanation||a.message||'')}<div class="val sub" style="margin-top:6px">
+       A refusal is the system declining to guess, not a failure.</div>`, 'warn');
+  } else {
+    html += step('✓','Answer', esc(a.explanation||''), r.legal===false ? 'bad':'ok');
+    if(Array.isArray(r.issues) && r.issues.length){
+      html += step('!','Rule breached',
+        r.issues.map(i=>`<div>${esc(i)}</div>`).join(''), 'bad');
+    }
+  }
+  html += trail(a.trace);
+  c.querySelector('.body').innerHTML = html;
+}
+
+/* ---------------------------------------------------------------- scenarios */
+async function runScenario(sid){
+  const s = S.scenarios.find(x=>x.id===sid) || {};
+  resolveEvent(eventFor(s), s.narrative || s.title, s.id);
+}
+
+function eventFor(x){
+  const first = String(x.subject||'').split(',')[0].trim();
+  const e = {type:x.type};
+  if(x.type==='SICK_CREW'||x.type==='CERT_EXPIRY') e.crew_id = first;
+  else if(x.type==='MULTI_SICK'){ e.type='SICK_CREW'; e.crew_id = first; }
+  else if(x.type==='DELAY'){ e.aircraft=x.subject; e.delay_hours=1.5; e.date='2026-09-16'; }
+  else if(x.type==='STATION_CLOSURE'){ e.station=x.subject;
+    e.start_utc='2026-09-17T08:00:00Z'; e.end_utc='2026-09-17T14:00:00Z'; }
+  return e;
+}
+
+async function resolveEvent(ev, headline, sid){
+  const c = card(sid ? 'Disruption · ' + sid : 'Live disruption', headline);
+  try{
+    const d = await (await fetch('/api/resolve_event',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({dynamic_event:ev})})).json();
+    renderDisruption(c, headline, d, ev);
+  }catch(err){
+    c.querySelector('.body').innerHTML = step('!','Could not run', esc(err.message),'bad');
+  }
+}
+
+function renderDisruption(c, headline, d, ev){
+  const imp = d.impact || {};
+  const sols = d.solutions || [];
+  const legal = sols.filter(o=>o.legal);
+  const out = sols.filter(o=>!o.legal);
+  const best = legal[0], next = legal[1];
+  const pid = imp.pairing_broken || ev.pairing_id || '';
+
+  /* 2. what breaks -- named sectors, because "3 flights" is not actionable */
+  let legs = '';
+  const byDay = imp.uncovered_by_day || {};
+  Object.keys(byDay).forEach(day=>{
+    legs += `<div class="legs">${byDay[day].map(f=>`<span class="leg">${esc(legOf(f))}</span>`).join('')}
+             <span class="day">${esc(day)}</span></div>`;
+  });
+
+  /* 3. who can take it, and who cannot */
+  let who = '';
+  if(legal.length){
+    who = legal.slice(0,4).map((o,i)=>
+      `<div class="opt${i===0?' pick':''}"><span class="rk">#${o.rank||i+1}</span>
+        <span class="who"><b>${esc(o.crew_id)}</b> <span class="why">${esc(
+          String(o.action||'').replace(/^Assign [A-Za-z ]+ /,''))}</span></span>
+        <span class="inr">${o.cost_inr?inr(o.cost_inr):''}</span></div>`).join('');
+    if(out.length){
+      who += out.slice(0,3).map(o=>
+        `<div class="opt out"><span class="rk">—</span>
+          <span class="who"><b>${esc(o.crew_id)}</b>
+          <span class="why">${esc(String(o.reason||o.reasoning||'not legal').slice(0,90))}</span></span>
+          <span class="inr"></span></div>`).join('');
+    }
+  }
+
+  let act = '';
+  if(best && pid){
+    const saving = (next && next.cost_inr>best.cost_inr)
+      ? `<span class="cost-note">${inr(next.cost_inr-best.cost_inr)} cheaper than the next legal option ·
+         a cancelled sector is ${inr(250000)}</span>` : '';
+    act = `<div class="act">
+      <button class="btn-go" onclick="authorise(this,'${esc(best.crew_id)}','${esc(pid)}')">
+        Authorise ${esc(best.crew_id)}</button>${saving}</div>`;
+  }
+
+  c.querySelector('.body').innerHTML =
+    step(1,'What happened', esc(headline), 'ok') +
+    step(2,'What breaks',
+      esc(d.problem || 'No downstream impact.') + legs,
+      imp.uncrewed_flights ? 'bad' : 'ok') +
+    step(3,'Who can legally take it',
+      legal.length
+        ? `<span class="sub">${legal.length} legal of ${sols.length} screened against all seven rules</span>${who}`
+        : '<span class="sub">No legal cover exists. That is the answer, not a failure.</span>',
+      legal.length ? 'ok' : 'bad') +
+    step(4,'What it costs',
+      best ? esc(best.action||'') + act
+           : '<span class="sub">Nothing to price until there is a legal option.</span>',
+      best ? 'ok' : 'bad');
+}
+
+/* ---------------------------------------------------------------- authorise */
+async function authorise(btn, crew, pairing){
+  btn.disabled = true; btn.textContent = 'Authorising…';
+  try{
+    const d = await (await fetch('/api/commit',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({crew_id:crew, pairing_id:pairing,
+                           role:'Captain', session:S.session})})).json();
+    if(d.error) throw new Error(d.error);
+    const q = d.consequences||{}, gap = q.standby_gap_hours||{}, thin = q.single_cover_trips||{};
+    const dGap = (gap.after||0)-(gap.before||0);
+    const row=(l,v,cls='')=>`<div class="crow"><span class="cl">${l}</span><span class="cv ${cls}">${v}</span></div>`;
+
+    let rows = row('Sectors now crewed', q.covered?'yes':'still uncrewed', q.covered?'good':'worse');
+    if(q.own_week) rows += row(`${esc(q.own_week.crew_id)} roster`, `+${q.own_week.duty_days_added} duty day(s)`);
+    if(q.left_standby) rows += row('Removed from standby', 'yes', 'worse');
+    if(gap.before!==undefined)
+      rows += row('Hours with no standby captain', `${gap.before} → ${gap.after}`, dGap>0?'worse':'good');
+    if(thin.before!==undefined)
+      rows += row('Trips down to one legal captain', `${thin.before} → ${thin.after}`, thin.delta>0?'worse':'good');
+
+    const note = dGap>0
+      ? `Spending a standby captain covers today and thins tomorrow — ${dGap} more hours now have no reserve
+         captain on call. Every question from here is answered in this world. Reset steps back out.`
+      : `Every question from here is answered in this world. Reset steps back out.`;
+
+    const box = document.createElement('div');
+    box.className = 'after';
+    box.innerHTML = `<div class="after-h">Authorised · ${esc(crew)} on ${esc(pairing)}</div>
+                     ${rows}<div class="cnote">${note}</div>`;
+    btn.closest('.card').appendChild(box);
+    btn.textContent = 'Authorised';
+    showWorld(d.what_if);
+  }catch(err){
+    btn.disabled=false; btn.textContent='Authorise failed — retry';
+    const n = document.createElement('div');
+    n.className='cnote'; n.style.color='var(--bad)';
+    n.textContent = err.message + '. Nothing was changed.';
+    btn.closest('.card').appendChild(n);
+  }
+}
+
+/* ---------------------------------------------------------------- world */
+function showWorld(list){
+  const w = $('world');
+  if(!list || !list.length){ w.classList.remove('on'); w.innerHTML=''; return; }
+  w.classList.add('on');
+  w.innerHTML = 'You are working in a changed world: ' +
+    list.map(x=>`<b>${esc(x)}</b>`).join(' · ') + '. Reset returns to the published roster.';
+}
+async function resetWorld(){
+  await fetch('/api/reset',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({session:S.session})});
+  showWorld([]);
+  $('feed').innerHTML='';
+}
+
+/* ---------------------------------------------------------------- trail */
+function trail(tr){
+  if(!tr || !tr.stages || !tr.stages.length) return '';
+  const stopped = tr.stages.find(s=>s.verdict==='block');
+  const rows = tr.stages.map(s=>{
+    const pair = TRAIL[s.name] || [s.name, ''];
+    const stop = s.verdict==='block' || s.verdict==='failed';
+    let data = '';
+    if(s.meta){
+      const bits = Object.keys(s.meta)
+        .filter(k=>k!=='agreement' && s.meta[k]!==null && s.meta[k]!=='')
+        .map(k=>`<span><b>${esc(k.replace(/_/g,' '))}</b>${esc(
+          Array.isArray(s.meta[k])?s.meta[k].join(', '):s.meta[k])}</span>`);
+      if(bits.length) data = `<div class="tdata">${bits.join('')}</div>`;
+    }
+    let opts = '';
+    if(s.options && s.options.length){
+      opts = `<div class="tdata">` + s.options.slice(0,5).map(o=>
+        `<span${o.chosen?' style="background:var(--ok-bg);color:var(--ok)"':''}>${esc(o.label)}${
+          o.score!==undefined?' <b style="margin:0 0 0 4px">'+o.score+'</b>':''}</span>`
+        ).join('') + `</div>`;
+    }
+    return `<div class="tstep ${stop?'stop':'pass'}"><span class="tdot"></span>
+      <span><span class="tname">${esc(pair[0])}</span><span class="tsays">${esc(pair[1])}</span></span>
+      <span><span class="tval">${esc(s.detail||'')}</span>${data}${opts}</span></div>`;
+  }).join('');
+  const stopName = stopped ? (TRAIL[stopped.name]||[stopped.name])[0] : '';
+  return `<div class="trail" onclick="this.classList.toggle('open')">
+      <div class="trail-h"><span class="car">▸</span>How this was decided
+        <span class="sum">
+          <span class="chip ${stopped?'bad':'ok'}">${tr.gates_passed} checks passed</span>
+          ${stopped?`<span class="chip bad">stopped at ${esc(stopName)}</span>`:''}
+          ${tr.options_rejected?`<span class="chip">${tr.options_rejected} ruled out</span>`:''}
+        </span></div>
+      <div class="trail-b">${rows}</div></div>`;
+}
+
+boot();
+</script>
+</body>
+</html>

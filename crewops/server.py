@@ -390,6 +390,9 @@ class Handler(BaseHTTPRequestHandler):
                 r = dict(_STATE["routing"])
                 r.pop("rows", None)
                 self._json(r)
+            elif path in ("/desk", "/desk/"):
+                with open(DESK_PATH, encoding="utf-8") as fh:
+                    self._send(200, fh.read().encode("utf-8"), "text/html; charset=utf-8")
             elif path == "/api/scenarios":
                 self._json(_scenario_list())
             elif path == "/api/examples":
@@ -771,6 +774,10 @@ EXAMPLES = [
 
 
 UI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui.html")
+# The rebuilt single-column desk, served at /desk. One column, ops vocabulary,
+# and nothing on screen that is not the disruption, the answer, or the
+# arithmetic behind it. The v3 cockpit stays on / until this replaces it.
+DESK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "desk.html")
 
 
 def _page() -> bytes:
