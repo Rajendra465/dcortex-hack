@@ -468,7 +468,12 @@ EXPECTED_TOOL = {
     "Q31": "rank_cover_options", "Q32": "solve_joint_cover",
     "Q33": "simulate_delay", "Q34": "rank_cover_options",
     "Q35": "simulate_station_closure", "Q36": "draft_notification",
-    "Q37": "rank_cover_options", "Q38": "get_risk_signals",
+    "Q37": "rank_cover_options",
+    # Q38 asks which three data points a standing briefing should carry.
+    # get_risk_signals was the honest answer to "what routing do we have"
+    # rather than to the question -- it returned 150 rows. morning_brief
+    # answers it.
+    "Q38": "morning_brief",
 }
 
 

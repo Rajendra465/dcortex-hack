@@ -215,7 +215,17 @@ def rule_cert_06(snap: Snapshot, crew_id: str, on: date, led: Ledger,
                else snap.certs_valid_on(crew_id, on))
     if not ok:
         led.add("invalid_certs", bad, source="certifications.json")
-        return [f"RULE-CERT-06: certification invalid on {on}"]
+        # Name the certificate and the day it lapsed. "certification invalid"
+        # is true and leaves a controller to go and look up which one, on a
+        # question whose whole point is which one.
+        detail = []
+        for t in bad:
+            exp = snap.certs.get(crew_id, {}).get(t)
+            if exp:
+                led.add(f"cert_expiry[{t}]", str(exp),
+                        source="certifications.json")
+            detail.append(f"{t} expired {exp}" if exp else t)
+        return [f"RULE-CERT-06: {', '.join(detail)}; duty on {on} is illegal"]
     return []
 
 

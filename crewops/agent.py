@@ -844,6 +844,14 @@ def summarise(tool: str, p: Any) -> str:
             s += f" {len(tied)} options tie at that price."
         s += f" {len(p['excluded_candidates'])} candidates were ruled out."
         return s
+    if tool == "simulate_delay" and p.get("breach") and p.get("recovery"):
+        r = p["recovery"]
+        best = (r.get("options") or [{}])[0]
+        keep = len((p.get("max_legal_prefix") or {}).get("legs") or [])
+        return (f"{p['summary']} Operate {keep} leg(s) as delayed and re-crew "
+                f"{', '.join(p['legs_to_shed'])}: "
+                f"{best.get('action', 'no legal cover found')}"
+                + (f" at INR {best['cost_inr']:,}." if best.get("cost_inr") else "."))
     if tool in ("simulate_crew_unavailable", "simulate_station_closure",
                 "simulate_delay", "simulate_cert_expiry"):
         return p["summary"]
@@ -859,9 +867,41 @@ def summarise(tool: str, p: Any) -> str:
                 + ", ".join(f"{r['crew_id']} ({r['rank']}, "
                             f"{r['window']['start']}-{r['window']['end']}Z)"
                             for r in p["reserves"][:6]))
+    if tool == "morning_brief":
+        # No numeric ranks: "1." and "2." are display scaffolding, and the
+        # guard rightly refuses digits that trace to nothing.
+        return " ".join(f"{d['what']} - {d['why']}" for d in p["points"])
     if tool == "find_flights":
-        if "answer" in p:
-            return f"{p['answer']}"
+        ans = p.get("answer")
+        if isinstance(ans, dict) and "passengers" in ans:
+            return (f"{ans['passengers']} seats at risk across {ans['legs']} "
+                    f"leg(s). Cancelling costs INR {ans['cost_inr']:,}.")
+        if isinstance(ans, dict) and "seats" in ans and "flights" in ans:
+            # Every figure in this sentence has to exist in the ledger. The
+            # first version wrote "(+12 more)", and 12 was arithmetic done in
+            # the sentence rather than by the kernel -- so the guard blocked
+            # the answer. It was right to.
+            names = ", ".join(ans["flights"][:6])
+            tail = f" -- {ans['why']}." if ans.get("why") else ""
+            return (f"{ans['seats']} seats, the most of any leg. "
+                    f"{ans['count']} legs share it: {names}{tail}")
+        if ans is not None:
+            return f"{ans}"
+        if not p["count"]:
+            # "0 flight(s):" is a true answer that reads like a broken one. A
+            # controller cannot tell whether nothing matched or the filter was
+            # wrong, so an empty result says what it looked for. Asking for DEL
+            # departures on an afternoon that has none should read as an
+            # answer, not a shrug.
+            said = [f"{k.replace('_', ' ')} {v}" for k, v in (
+                ("departing", p.get("dep_station")),
+                ("arriving", p.get("arr_station")),
+                ("on", p.get("date")),
+                ("after", p.get("dep_after_utc")),
+                ("before", p.get("dep_before_utc")),
+            ) if v]
+            return ("No flights " + ", ".join(said) + "." if said
+                    else "No flights match that.")
         return f"{p['count']} flight(s): " + ", ".join(p["flights"][:12])
     if tool == "find_crew":
         return (f"{p['count']} crew: "

@@ -382,6 +382,12 @@ INTENTS: list[Intent] = [
         "any illegal assignments", "what have we missed",
     ], boost=1.2),
 
+    Intent("morning_brief", [
+        "standing morning briefing", "what should the briefing show",
+        "which three data points", "morning brief", "what to surface daily",
+        "start of day board", "what should the desk look at",
+    ], boost=1.4),
+
     Intent("reserve_gaps", [
         "reserve coverage gaps", "standby holes", "hours with no standby",
         "when do we have no reserve",
@@ -777,13 +783,27 @@ def bind_args(tool: str, ents: Entities, snap: Snapshot,
             put("dep_station", ents.stations[0])
             put("base", ents.stations[0])
 
-    if tool == "simulate_station_closure" and ents.dates and len(ents.times) >= 2:
-        a["start_utc"] = f"{ents.dates[0]}T{ents.times[0]}:00Z"
-        a["end_utc"] = f"{ents.dates[0]}T{ents.times[1]}:00Z"
+    if tool == "simulate_station_closure" and len(ents.times) >= 2:
+        # The brief's own example is "Station BLR is closed 14:00-20:00 --
+        # what's the crew impact?" -- a station, a window, and no date. That
+        # refused for want of start_utc, which is a fair thing to ask for and
+        # the wrong thing to ask when the window is right there in the
+        # sentence. An undated closure means today, the same reading
+        # "this afternoon" gets a few lines above.
+        day = ents.dates[0] if ents.dates else today.isoformat()
+        a["start_utc"] = f"{day}T{ents.times[0]}:00Z"
+        a["end_utc"] = f"{day}T{ents.times[1]}:00Z"
     if tool == "compute_duty_period" and ents.dates and ents.times:
         a["release_utc"] = f"{ents.dates[0]}T{ents.times[0]}:00Z"
-    if tool == "find_flights" and re.search(r"\bhow many\b", question, re.I):
-        a["aggregate"] = "count"
+    if tool == "find_flights":
+        ql2 = question.lower()
+        if re.search(r"most seats|largest aircraft|seats at risk", ql2):
+            a["aggregate"] = "max_seats"
+        elif re.search(r"cancel", ql2) and re.search(
+                r"how many passenger|passengers.*(affect|cost)|what.*cost", ql2):
+            a["aggregate"] = "cancel_cost"
+        elif re.search(r"\bhow many\b", ql2):
+            a["aggregate"] = "count"
     if tool == "duty_hours" and re.search(r"\b(flight|block)\s*hour", question,
                                           re.I):
         a["metric"] = "flight"
