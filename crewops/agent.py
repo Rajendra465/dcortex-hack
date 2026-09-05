@@ -132,22 +132,55 @@ def screen_scope(question: str) -> Refusal | None:
     return None
 
 
-def screen_dates(question: str, snap: Snapshot) -> Refusal | None:
-    """The legality horizon equals the data horizon. Say so rather than guess."""
-    lo, hi = snap.horizon
+# Different data domains end on different days, so "out of range" is a
+# per-capability fact, not one global cliff. Certificates run to 2032; the
+# roster stops after a week. One shared horizon meant every licence-expiry
+# question past the 20th was refused against data that was sitting right there.
+CERT_TOOLS = {"get_certifications", "simulate_cert_expiry"}
+
+
+def _dates_in(question: str) -> list[date]:
+    out = []
     for m in re.finditer(r"\b(20\d{2})-(\d{2})-(\d{2})\b", question):
         try:
-            d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            out.append(date(int(m.group(1)), int(m.group(2)), int(m.group(3))))
         except ValueError:
             continue
-        if not (snap.history_start <= d <= hi):
-            return Refusal(
-                "OUT_OF_RANGE",
-                f"{d} is outside the data I have.",
-                have=f"rosters and flights {lo} to {hi}; duty history back to "
-                     f"{snap.history_start}",
-                would_need="roster data covering that date",
-            )
+    return out
+
+
+def screen_dates(question: str, snap: Snapshot,
+                 tool: str | None = None) -> Refusal | None:
+    """The answerable horizon equals the data horizon -- of the right domain.
+
+    Called twice. Before planning, `tool` is None and the check is the UNION of
+    every domain, so a 2027 certificate question survives to reach the planner.
+    After planning it is called again with the chosen capability, and the tight
+    horizon for that capability applies -- so asking for a roster in 2027 is
+    still refused, and refused with the horizon that actually bounds it.
+    """
+    lo, hi = snap.horizon
+    clo, chi = snap.cert_horizon
+    if tool is None:
+        upper, what = max(hi, chi), "roster, duty history or certificate"
+        need = "data covering that date"
+    elif tool in CERT_TOOLS:
+        upper, what = chi, "certificate"
+        need = "certificate records covering that date"
+    else:
+        upper, what = hi, "roster"
+        need = "roster data covering that date"
+
+    for d in _dates_in(question):
+        if snap.history_start <= d <= upper:
+            continue
+        return Refusal(
+            "OUT_OF_RANGE",
+            f"{d} is outside the {what} data I have.",
+            have=f"rosters and flights {lo} to {hi}; duty history back to "
+                 f"{snap.history_start}; certificate validity to {chi}",
+            would_need=need,
+        )
     return None
 
 
@@ -233,11 +266,27 @@ RULES:
 """
 
 _NUM = re.compile(r"\d+(?:\.\d+)?")
+
+# Tokens whose digits are part of a NAME, a DATE or a CLOCK TIME, and so make
+# no claim about quantity. Order matters: the ISO timestamp must be stripped
+# before the bare date, or the date pattern eats its first ten characters and
+# leaves "T03:30:00Z" behind.
+#
+# Every entry here earned its place by producing a false block on a correct
+# answer. The trailing-Z cases are the instructive ones: `\b\d{1,2}:\d{2}\b`
+# matches "04:00" but NOT the "16:00" in "04:00-16:00Z", because Z is a word
+# character and kills the closing boundary -- so exactly one half of every
+# on-call window was being reported as an uncited figure.
 _STRIP = [
+    re.compile(r"\b20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?Z?"),
     re.compile(r"\bC-\d{4}\b"), re.compile(r"\bP-\d{4}\b"),
     re.compile(r"\bDX\d{3}(?:-\d{4}-\d{2}-\d{2})?\b"), re.compile(r"\bVT-DX[A-F]\b"),
     re.compile(r"\bRULE-[A-Z]+-\d+\b"), re.compile(r"\b20\d{2}-\d{2}-\d{2}\b"),
-    re.compile(r"\b\d{1,2}:\d{2}\b"), re.compile(r"\bA320\b"), re.compile(r"\bATR ?72\b"),
+    re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?Z?"),
+    re.compile(r"\bA320\b"), re.compile(r"\bATR ?72\b"),
+    # A digit glued to the end of a word is part of the word --
+    # medical_class1, class2 -- and never a quantity.
+    re.compile(r"[A-Za-z_]\d+\b"),
 ]
 
 
@@ -412,13 +461,34 @@ class Advisor:
         ranked = score_intents(question, ents)
         top = ranked[0][0] if ranked else 0.0
 
-        plan = None
-        if top >= CONFIDENT:
-            plan = plan_from_index(question, ents, self.snap, CONFIDENT)
+        plan, clarify = None, None
+        try:
+            if top >= CONFIDENT:
+                plan = plan_from_index(question, ents, self.snap, CONFIDENT)
+        except PlanError as e:
+            # The index is sure WHICH capability this is and cannot bind it.
+            # Hold that clarifying question: the model may still resolve the
+            # missing argument, and if it cannot, asking beats guessing.
+            clarify = e
         if plan is None and self.client:
             plan = plan_from_model(question, ents, self.client)
-        if plan is None and top >= FLOOR:
-            plan = plan_from_index(question, ents, self.snap, FLOOR)
+        if plan is None and clarify is None and top >= FLOOR:
+            try:
+                plan = plan_from_index(question, ents, self.snap, FLOOR)
+            except PlanError as e:
+                clarify = e
+        if plan is None and clarify is not None:
+            # "add the which crew member or trip" -- the naive f-string read
+            # as broken English the moment `would_need` started carrying a
+            # phrase rather than a bare parameter name.
+            need = clarify.would_need
+            tip = (f"say {need}" if need and need[0].islower()
+                   and need.split()[0] in {"which", "what", "how", "who"}
+                   else f"add the {need}")
+            r = Refusal("CLARIFY", clarify.message, have=clarify.have,
+                        would_need=need,
+                        suggestions=[tip] if need else [])
+            return done(refusal=r, prose=r.message)
         if plan is None:
             r = Refusal(
                 "PARSE_FAIL", "I didn't understand that one.",
@@ -429,7 +499,15 @@ class Advisor:
                              "or say what you want to do: cover, check, impact"])
             return done(refusal=r, prose=r.message)
 
-        # 3. validate BEFORE anything executes
+        # 3. validate BEFORE anything executes. The date screen runs again now
+        # that we know WHICH capability was chosen: the pre-plan pass used the
+        # union of every domain's horizon so a 2027 certificate question could
+        # get this far, and this pass applies the horizon that actually bounds
+        # the tool we landed on.
+        for st in plan.steps:
+            late = screen_dates(question, self.snap, st.tool)
+            if late:
+                return done(plan=plan, refusal=late, prose=late.message)
         try:
             validate(plan)
         except PlanError as e:
@@ -472,6 +550,13 @@ class Advisor:
 _PRONOUN = re.compile(r"\b(he|him|his|she|her|they|them|their|that one|"
                       r"the same|instead)\b", re.I)
 _THAT_TRIP = re.compile(r"\b(that|the|this) (trip|pairing|rotation|it)\b", re.I)
+# "which flights are NOW uncrewed?" names nobody and contains no pronoun, but
+# it is unmistakably about the disruption just stacked. Without this the
+# question fell through to a plain schedule listing and answered with all 147
+# flights -- technically true, and completely useless.
+_CONSEQUENCE = re.compile(
+    r"\b(now|as a result|because of (?:that|this)|knock[- ]on|downstream|"
+    r"what breaks|what is affected|what's affected|impact)\b", re.I)
 
 
 @dataclass
@@ -521,7 +606,16 @@ class Session:
 
     # ---- context ------------------------------------------------------
     def _last_ids(self) -> tuple[str | None, str | None]:
-        """The crew and pairing the most recent successful turn resolved."""
+        """The crew and pairing the conversation is currently about.
+
+        A stacked what-if outranks a previous answer: once "C-1042 is sick" is
+        the world we are in, that is who the next unqualified question means,
+        even if the turn after it asked about someone else in passing.
+        """
+        for ev in reversed(self.events):
+            cid = getattr(ev, "crew_id", None)
+            if cid:
+                return cid, getattr(ev, "pairing_id", None)
         for turn in reversed(self.turns):
             a = turn.answer
             if a.refusal or not a.plan:
@@ -541,8 +635,13 @@ class Session:
         has_pair = bool(re.search(r"\bP-\d{4}\b", question))
         if has_crew and has_pair:
             return question, notes
-        if not (_PRONOUN.search(question) or _THAT_TRIP.search(question)
-                or question.lower().startswith(("and ", "what about", "instead"))):
+        refers_back = (_PRONOUN.search(question) or _THAT_TRIP.search(question)
+                       or question.lower().startswith(("and ", "what about",
+                                                       "instead")))
+        # A consequence question only refers back when there IS a disruption
+        # to be a consequence of. With an empty stack, "what is the impact"
+        # is a fresh question and must not silently inherit a subject.
+        if not refers_back and not (self.events and _CONSEQUENCE.search(question)):
             return question, notes
 
         crew, pair = self._last_ids()
@@ -560,12 +659,48 @@ class Session:
     # ---- ask ----------------------------------------------------------
     def ask(self, question: str) -> Answer:
         resolved, notes = self._carry(question)
-        a = self.advisor.ask(resolved)
+        a = self._ask_in_the_right_world(resolved, notes)
         a.question = question          # show what the controller typed
         a.assumptions = notes + a.assumptions
         a.overlays = self.what_if
         self.turns.append(Turn(question, a))
         return a
+
+    def _ask_in_the_right_world(self, resolved: str,
+                                notes: list[str]) -> Answer:
+        """Pick the snapshot the question is actually about.
+
+        A stacked what-if is applied to the snapshot, which is right for every
+        LOOKUP -- "who is on P-2291 now" must see the disrupted roster. It is
+        wrong for the SIMULATION of the event that was just stacked: the crew
+        is already stripped, so the simulator removes nobody and reports that
+        nothing broke. Asking "what breaks?" straight after ":whatif C-1042
+        sick" answered "0 flights uncrewed", which is the most dangerous kind
+        of wrong answer this system can give -- a disruption that reads clean.
+
+        So a consequence question is planned one layer down, in the world
+        BEFORE the top event, and the simulator re-applies it itself. If the
+        plan turns out to be a lookup after all, we discard that answer and
+        redo it against the full overlay. Two passes of a few milliseconds is
+        a cheap price for not confusing the two worlds.
+        """
+        if not self.events:
+            return self.advisor.ask(resolved)
+
+        from .events import apply
+        overlaid = self.advisor.snap
+        try:
+            self.advisor.snap = apply(self.base, self.events[:-1])
+            a = self.advisor.ask(resolved)
+        finally:
+            self.advisor.snap = overlaid
+
+        if a.plan and REGISTRY[a.plan.tool].kind == "simulation":
+            notes.append(f"evaluated against the world before "
+                         f"{self.events[-1].describe()}, which the simulation "
+                         f"re-applies")
+            return a
+        return self.advisor.ask(resolved)
 
 
 # --------------------------------------------------------------------------
@@ -574,6 +709,15 @@ class Session:
 
 
 def summarise(tool: str, p: Any) -> str:
+    """One deterministic sentence per capability. No model involved."""
+    # A conjunctive plan carries the other half of the question beside the
+    # leader's payload. Summarise both, leader first, so neither half of
+    # "what is their rank, and their 28-day hours" is silently dropped.
+    if isinstance(p, dict) and p.get("also"):
+        rest = p["also"]
+        head = summarise(tool, {k: v for k, v in p.items() if k != "also"})
+        return " ".join([head] + [summarise(o["tool"], o["result"])
+                                  for o in rest])
     if tool == "check_legality":
         if p["legal"]:
             s = f"{p['crew_id']} can legally cover {p['pairing_id']}."

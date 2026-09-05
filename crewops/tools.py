@@ -36,15 +36,21 @@ class Tool:
     required: tuple[str, ...]
     doc: str
     kind: str  # retrieval | simulation | optimisation
+    # Arguments where ONE of a group must be present. compute_duty_period
+    # declared nothing required but indexes pairing_id in its body, so a plan
+    # missing both it and release_utc passed validation and died at runtime as
+    # an entity error -- a crash wearing a refusal costume.
+    requires_one_of: tuple = ()
 
     def __call__(self, snap: Snapshot, **kw: Any) -> Result:
         return self.fn(snap, **kw)
 
 
 def tool(name: str, params: dict[str, str], required: tuple[str, ...],
-         kind: str, doc: str):
+         kind: str, doc: str, requires_one_of: tuple = ()):
     def deco(fn: Callable[..., Result]) -> Callable[..., Result]:
-        REGISTRY[name] = Tool(name, fn, params, required, doc, kind)
+        REGISTRY[name] = Tool(name, fn, params, required, doc, kind,
+                              requires_one_of)
         return fn
     return deco
 
@@ -201,15 +207,20 @@ def get_roster(snap: Snapshot, **kw: Any) -> Result:
        "base": "3-letter code", "rank": "Captain | ...",
        "ranks": "list, for a class such as pilots",
        "rating": "A320 | ATR72", "covers_utc": "full ISO timestamp"},
-      ("date",), "retrieval",
+      (), "retrieval",
       "Standby crew on call for a date, optionally filtered to those whose "
-      "window covers a specific report time.")
+      "window covers a specific report time.",
+      requires_one_of=(("date", "crew_id", "base", "rank", "ranks"),))
 def get_reserves(snap: Snapshot, **kw: Any) -> Result:
     led = Ledger()
-    d = kw["date"]
+    # `date` used to be mandatory, which made "is C-3310 on standby?" and
+    # "which captains are on the reserve pool?" unanswerable for no reason:
+    # the pool itself is a fact independent of any one day. Omitting it now
+    # returns the whole roster of on-call crew with their date lists.
+    d = kw.get("date")
     rows = []
     for cid, r in snap.reserves.items():
-        if d not in r.dates:
+        if d and d not in r.dates:
             continue
         c = snap.crew[cid]
         if kw.get("crew_id") and cid != kw["crew_id"]:
@@ -233,10 +244,11 @@ def get_reserves(snap: Snapshot, **kw: Any) -> Result:
             "window": {"start": r.window_start, "end": r.window_end},
             "reachability_minutes": c.reachability_minutes,
             "covers": covers,
+            "on_call_dates": list(r.dates) if not d else None,
         })
     rows.sort(key=lambda x: x["crew_id"])
     led.add("reserves_on_call", len(rows), source="reserve_pool.json")
-    return {"reserves": rows, "count": len(rows)}, led
+    return {"reserves": rows, "count": len(rows), "date": d}, led
 
 
 @tool("duty_hours",
@@ -270,6 +282,11 @@ def duty_hours(snap: Snapshot, **kw: Any) -> Result:
                 r["hours"], "h",
                 source="duty_clocks.daily_history + rosters.json",
                 derivation=f"{wd} calendar days ending {end}")
+        # The window length is a number the answer says out loud ("over 7
+        # days"), so it belongs in the ledger. A figure the narrator is
+        # allowed to use but cannot cite is exactly the gap the containment
+        # guard exists to close.
+        led.add("window_days", wd, "days")
         led.add("limit_hours", cap, "h")
         led.add("headroom_hours", r["headroom_hours"], "h",
                 derivation=f"{cap} - {r['hours']}")
@@ -325,9 +342,20 @@ def get_risk_signals(snap: Snapshot, **kw: Any) -> Result:
     rows.sort(key=lambda r: -r["disruption_risk_score"])
     if kw.get("top_n"):
         rows = rows[:int(kw["top_n"])]
+    led.add("risk_signals_matching", len(rows),
+            source="risk_signals.json (provided input)")
     if kw.get("crew_id") and rows:
         led.add("disruption_risk_score", rows[0]["disruption_risk_score"],
                 source="risk_signals.json (provided input)")
+        # The driver strings are quoted verbatim to the controller and carry
+        # their own figures ("short-rest pattern over last 14 days"). Those
+        # numbers are real -- they are simply somebody else's, not ours -- so
+        # they are ledgered as PROVIDED rather than left uncited. Recording
+        # them is what lets the containment guard stay strict everywhere else
+        # instead of being loosened to accommodate this one tool.
+        for n in re.findall(r"\d+(?:\.\d+)?", " ".join(rows[0]["drivers"])):
+            led.add(f"driver_figure[{n}]", float(n) if "." in n else int(n),
+                    source="risk_signals.json drivers (provided verbatim)")
     return {"signals": [{"crew_id": r["crew_id"],
                          "score": r["disruption_risk_score"],
                          "drivers": r["drivers"]} for r in rows],
@@ -361,7 +389,8 @@ def get_rulebook(snap: Snapshot, **kw: Any) -> Result:
       {"pairing_id": "e.g. P-2291", "date": "YYYY-MM-DD",
        "delay_hours": "float", "release_utc": "ISO timestamp"},
       (), "simulation",
-      "Duty period, FDP and the earliest legal next report for one duty day.")
+      "Duty period, FDP and the earliest legal next report for one duty day.",
+      requires_one_of=(("pairing_id", "release_utc"),))
 def compute_duty_period(snap: Snapshot, **kw: Any) -> Result:
     led = Ledger()
     if kw.get("release_utc"):

@@ -243,6 +243,19 @@ class Snapshot:
         any_crew = next(iter(self.history.values()))
         return min(any_crew)
 
+    @property
+    def cert_horizon(self) -> tuple[date, date]:
+        """How far ahead certificate questions can be answered.
+
+        Not the same as `horizon`. The roster runs one week; certificate
+        validity runs to 2032, so "whose licences lapse before March?" is a
+        question this dataset CAN answer and was being refused as out of range
+        purely because the roster stops on the 20th. A refusal that is wrong is
+        worse than a wrong answer -- it teaches the controller not to ask.
+        """
+        vs = [v for m in self.certs.values() for v in m.values()]
+        return (min(vs), max(vs)) if vs else self.horizon
+
     # ---- lookups -------------------------------------------------------
     def pairing_of_flight(self, flight_id: str) -> tuple[Pairing, PairingDay] | None:
         hit = self.flight_to_pairing.get(flight_id)

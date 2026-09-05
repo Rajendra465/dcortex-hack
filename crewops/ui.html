@@ -6,43 +6,101 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* EFIS instrument palette: cyan = reference value, amber = caution,
-   red = warning, green = normal. The operator's own colour language. */
+/* ==========================================================================
+   EFIS instrument palette. This is the operator's own colour language, not a
+   brand palette: cyan = reference value, amber = caution, red = warning,
+   green = normal, magenta = supplied by someone else. A controller reads
+   these meanings before they read the words, so nothing else may use them.
+
+   Every token is declared on bare :root. The dark block only REDEFINES, so a
+   viewer on system-default (which stamps no data-theme at all) still gets a
+   complete palette.
+   ========================================================================== */
 :root{
-  --bg:#070b10; --panel:#0f151d; --panel2:#151d27; --panel3:#1c2631;
-  --ink:#e8eef4; --ink2:#93a3b3; --ink3:#61717f;
-  --line:#1f2a36; --line2:#2b3947;
-  --cyan:#4fc3e8; --cyan-dim:#123243;
-  --amber:#e8a33d; --amber-dim:#33260f;
-  --red:#f0705f; --red-dim:#361713;
-  --green:#5fc98c; --green-dim:#0f2b1d;
-  --magenta:#cf8fc4; --magenta-dim:#2a1a28;
+  --bg:#eef1f5; --bg2:#e4e9ef;
+  --panel:#ffffff; --panel2:#e9eef3; --panel3:#dde4ec;
+  --ink:#0d141c; --ink2:#4a5967; --ink3:#77869a;
+  --line:#d4dce5; --line2:#bfcad6;
+  --cyan:#0a6280; --cyan-dim:#dcedf4;
+  --amber:#8a5808; --amber-dim:#f8eeda;
+  --red:#a02a1d;   --red-dim:#fae4e1;
+  --green:#226943; --green-dim:#e0f0e7;
+  --magenta:#87397d; --magenta-dim:#f3e5f1;
+  --glow:transparent;
   --d:'Archivo',system-ui,-apple-system,sans-serif;
   --b:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
   --m:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Consolas,monospace;
   --ez:cubic-bezier(.4,0,.2,1);
+  --spring:cubic-bezier(.22,1.2,.36,1);
 }
-:root[data-theme="light"]{
-  --bg:#eef1f5; --panel:#fff; --panel2:#e8edf2; --panel3:#dde4ec;
-  --ink:#0e151d; --ink2:#4b5a68; --ink3:#78879a;
-  --line:#d5dde5; --line2:#c0cbd6;
-  --cyan:#0b6280; --cyan-dim:#dcedf4; --amber:#8a5a08; --amber-dim:#f8eeda;
-  --red:#a02a1d; --red-dim:#fae4e1; --green:#256b45; --green-dim:#e0f0e7;
-  --magenta:#87397d; --magenta-dim:#f3e5f1;
+:root:not([data-theme="light"]){
+  --bg:#060a0f; --bg2:#04070b;
+  --panel:#0e141c; --panel2:#141d27; --panel3:#1b2531;
+  --ink:#e9eef4; --ink2:#94a4b4; --ink3:#5f7080;
+  --line:#1e2833; --line2:#2b3846;
+  --cyan:#4fc3e8; --cyan-dim:#0e2c3c;
+  --amber:#e8a33d; --amber-dim:#31240e;
+  --red:#f0705f;   --red-dim:#341612;
+  --green:#5fc98c; --green-dim:#0e291b;
+  --magenta:#cf8fc4; --magenta-dim:#281826;
+  --glow:#4fc3e8;
 }
+:root[data-theme="dark"]{
+  --bg:#060a0f; --bg2:#04070b;
+  --panel:#0e141c; --panel2:#141d27; --panel3:#1b2531;
+  --ink:#e9eef4; --ink2:#94a4b4; --ink3:#5f7080;
+  --line:#1e2833; --line2:#2b3846;
+  --cyan:#4fc3e8; --cyan-dim:#0e2c3c;
+  --amber:#e8a33d; --amber-dim:#31240e;
+  --red:#f0705f;   --red-dim:#341612;
+  --green:#5fc98c; --green-dim:#0e291b;
+  --magenta:#cf8fc4; --magenta-dim:#281826;
+  --glow:#4fc3e8;
+}
+
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--b);font-size:14.5px;
   line-height:1.55;-webkit-font-smoothing:antialiased;overflow:hidden}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid var(--cyan);outline-offset:2px}
 ::selection{background:var(--cyan);color:var(--bg)}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:var(--line2);border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:var(--ink3)}
 ::-webkit-scrollbar-track{background:transparent}
 
-#app{display:grid;grid-template-rows:auto 1fr;height:100%}
-#bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:0 16px;
-  min-height:44px;background:var(--panel);border-bottom:1px solid var(--line);
+/* -------------------------------------------------------------- cold open */
+/* An avionics self-test. Every figure in it is fetched, not written: if the
+   kernel regressed to 41/42 this screen says 41. A splash that cannot be
+   wrong is the only kind worth showing. */
+#boot{position:fixed;inset:0;z-index:90;background:var(--bg2);
+  display:grid;place-items:center;font-family:var(--m)}
+#boot.gone{pointer-events:none}
+#bootIn{width:min(560px,86vw)}
+#bootTitle{font-family:var(--d);font-weight:800;font-size:clamp(20px,3vw,27px);
+  letter-spacing:-.02em;margin-bottom:3px}
+#bootSub{font-size:10.5px;letter-spacing:.16em;color:var(--ink3);
+  text-transform:uppercase;margin-bottom:22px}
+.bl{display:flex;gap:12px;align-items:baseline;font-size:12px;padding:3.5px 0;
+  color:var(--ink2);opacity:0}
+.bl .k{flex:1;color:var(--ink3);letter-spacing:.04em}
+.bl .v{color:var(--ink);font-variant-numeric:tabular-nums}
+.bl .st{width:52px;text-align:right;letter-spacing:.1em;font-size:10px}
+.bl .st.ok{color:var(--green)} .bl .st.no{color:var(--red)}
+.bl .st.pend{color:var(--ink3)}
+#bootBar{height:2px;background:var(--line);margin-top:20px;overflow:hidden}
+#bootBar i{display:block;height:100%;width:0;background:var(--cyan)}
+#bootSkip{margin-top:13px;font-size:9.5px;letter-spacing:.14em;color:var(--ink3);
+  text-transform:uppercase}
+
+/* ---------------------------------------------------------------- chrome */
+#app{display:grid;grid-template-rows:auto auto 1fr;height:100%;
+  opacity:0;transition:opacity .5s var(--ez)}
+#app.up{opacity:1}
+#bar{display:flex;align-items:center;gap:15px;flex-wrap:wrap;padding:0 16px;
+  min-height:46px;background:var(--panel);border-bottom:1px solid var(--line);
   font-family:var(--m);font-size:10.5px;letter-spacing:.07em;color:var(--ink2);
   text-transform:uppercase}
 #bar b{color:var(--ink);font-weight:600}
@@ -54,18 +112,34 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   color:var(--green);background:var(--green-dim);border:1px solid currentColor;
   transition:color .35s var(--ez),background .35s var(--ez)}
 #mode.whatif{color:var(--amber);background:var(--amber-dim)}
-#score{margin-left:auto;display:flex;gap:12px;align-items:center}
+#right{margin-left:auto;display:flex;gap:12px;align-items:center}
+#right button{color:var(--ink2);letter-spacing:.07em;transition:color .15s}
+#right button:hover{color:var(--cyan)}
 .wrong0{color:var(--green)}
 
-#cols{display:grid;grid-template-columns:274px minmax(0,1fr) 0;height:100%;
-  overflow:hidden;transition:grid-template-columns .3s var(--ez)}
-#cols.ev{grid-template-columns:274px minmax(0,1fr) 380px}
-@media(max-width:1100px){#cols,#cols.ev{grid-template-columns:1fr}
+/* ------------------------------------------------------- what-if layers */
+#layers{display:none;gap:8px;align-items:center;padding:8px 16px;
+  background:var(--amber-dim);border-bottom:1px solid var(--line);
+  font-family:var(--m);font-size:10.5px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--amber);overflow-x:auto}
+#layers.on{display:flex}
+.layer{display:flex;align-items:center;gap:7px;padding:3px 9px;border-radius:3px;
+  border:1px solid currentColor;white-space:nowrap;background:var(--panel)}
+.layer .ix{opacity:.6}
+#layers .push{margin-left:auto;color:var(--ink2);border:1px solid var(--line2);
+  padding:3px 9px;border-radius:3px;transition:color .15s,border-color .15s}
+#layers .push:hover{color:var(--red);border-color:var(--red)}
+
+#cols{display:grid;grid-template-columns:278px minmax(0,1fr) 0;height:100%;
+  overflow:hidden;transition:grid-template-columns .34s var(--ez)}
+#cols.ev{grid-template-columns:278px minmax(0,1fr) 396px}
+@media(max-width:1180px){#cols,#cols.ev{grid-template-columns:1fr}
   #board,#evi{display:none}}
 
+/* ---------------------------------------------------------- morning board */
 #board{background:var(--panel);border-right:1px solid var(--line);
-  overflow-y:auto;padding:14px 0 40px}
-.grp{padding:0 14px;margin-bottom:22px}
+  overflow-y:auto;padding:15px 0 44px}
+.grp{padding:0 14px;margin-bottom:23px}
 .grp h2{font-family:var(--m);font-size:9.5px;letter-spacing:.14em;color:var(--ink3);
   text-transform:uppercase;margin-bottom:9px;display:flex;gap:7px;align-items:center}
 .grp h2::after{content:'';flex:1;height:1px;background:var(--line)}
@@ -79,9 +153,9 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
 .frag{display:flex;align-items:center;gap:9px;padding:6px 0;width:100%;
   border-bottom:1px solid var(--line);font-size:12px;text-align:left;
-  transition:color .15s}
+  transition:color .15s,transform .18s var(--spring)}
 .frag:last-child{border-bottom:0}
-.frag:hover{color:var(--cyan)}
+.frag:hover{color:var(--cyan);transform:translateX(2px)}
 .frag .n{font-family:var(--m);font-weight:600;width:20px;text-align:center;
   padding:1px 0;border-radius:2px;font-size:11px}
 .frag .n.crit{color:var(--red);background:var(--red-dim)}
@@ -91,14 +165,16 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .frag .r{color:var(--ink3);font-size:11px;margin-left:auto}
 
 .gapbar{display:flex;gap:1px;margin:5px 0 3px}
-.gapbar i{flex:1;height:15px;border-radius:1px;background:var(--green-dim)}
-.gapbar i.x{background:var(--red);opacity:.75}
+.gapbar i{flex:1;height:16px;border-radius:1px;background:var(--green-dim);
+  transition:transform .12s var(--ez)}
+.gapbar i.x{background:var(--red);opacity:.78}
+.gapbar i:hover{transform:scaleY(1.35)}
 .gaplbl{font-family:var(--m);font-size:9px;color:var(--ink3);
   display:flex;justify-content:space-between}
 
 .ex{display:block;width:100%;text-align:left;padding:6px 8px;border-radius:3px;
   font-size:12.5px;color:var(--ink2);line-height:1.35;
-  transition:background .16s,color .16s,transform .16s var(--ez)}
+  transition:background .16s,color .16s,transform .16s var(--spring)}
 .ex:hover{background:var(--panel2);color:var(--ink);transform:translateX(2px)}
 .tg{font-family:var(--m);font-size:8.5px;letter-spacing:.1em;padding:1px 4px;
   border-radius:2px;margin-right:6px}
@@ -107,21 +183,29 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .tg.t3{color:var(--green);background:var(--green-dim)}
 .tg.t4{color:var(--amber);background:var(--amber-dim)}
 
+/* ------------------------------------------------------------------ desk */
 #desk{display:grid;grid-template-rows:1fr auto;overflow:hidden;min-width:0}
-#feed{overflow-y:auto;padding:22px 26px 8px;scroll-behavior:smooth}
-#feedInner{max-width:840px;margin:0 auto}
-#hero{padding:34px 0 24px;border-bottom:1px solid var(--line);margin-bottom:22px}
-#hero h1{font-family:var(--d);font-weight:800;font-size:clamp(26px,3.4vw,34px);
-  letter-spacing:-.025em;line-height:1.05;margin-bottom:9px}
-#hero p{color:var(--ink2);font-size:15px;max-width:56ch}
+#feed{overflow-y:auto;padding:24px 26px 8px;scroll-behavior:smooth}
+#feedInner{max-width:860px;margin:0 auto}
+#hero{padding:30px 0 26px;border-bottom:1px solid var(--line);margin-bottom:24px}
+#hero h1{font-family:var(--d);font-weight:800;font-size:clamp(27px,3.5vw,36px);
+  letter-spacing:-.028em;line-height:1.04;margin-bottom:11px;text-wrap:balance}
+#hero p{color:var(--ink2);font-size:15px;max-width:58ch}
 #hero .k{color:var(--ink);font-weight:600}
+#heroStats{display:flex;gap:26px;flex-wrap:wrap;margin-top:18px;
+  font-family:var(--m);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink3)}
+#heroStats b{display:block;font-family:var(--d);font-size:21px;letter-spacing:-.02em;
+  color:var(--ink);font-variant-numeric:tabular-nums;margin-bottom:1px}
+#heroStats .g b{color:var(--green)}
+#heroStats .c b{color:var(--cyan)}
 
-.turn{margin-bottom:26px}
+.turn{margin-bottom:28px}
 .you{font-family:var(--d);font-size:15px;font-weight:600;color:var(--ink2);
   display:flex;gap:9px;align-items:baseline;margin-bottom:11px}
 .you::before{content:'\25B8';color:var(--cyan);font-size:12px}
 
-.card{background:var(--panel);border:1px solid var(--line);border-radius:5px;
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;
   overflow:hidden;position:relative}
 .card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
   background:var(--cyan)}
@@ -130,10 +214,31 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .card.refuse::before{background:var(--amber)}
 .card.drafted::before{background:repeating-linear-gradient(180deg,
   var(--amber) 0 4px,transparent 4px 8px)}
-.card > .body{padding:17px 20px}
+.card > .body{padding:18px 21px}
 
-.lede{font-family:var(--d);font-size:16.5px;font-weight:600;line-height:1.42;
-  letter-spacing:-.008em;margin-bottom:10px}
+.lede{font-family:var(--d);font-size:16.5px;font-weight:600;line-height:1.45;
+  letter-spacing:-.008em;margin-bottom:11px;text-wrap:pretty}
+
+/* ------------------------------------------------- the traced number chip */
+/* The whole thesis, made visible. A number the kernel computed is underlined
+   in cyan and links to its ledger row; a number that appears in prose without
+   a matching fact is flagged amber. On a well-behaved answer every figure is
+   cyan, and you can click any of them to see where it came from. */
+.num{font-variant-numeric:tabular-nums;border-bottom:1.5px solid var(--cyan);
+  cursor:pointer;padding:0 1px;border-radius:2px;
+  transition:background .15s,color .15s}
+.num:hover,.num.lit{background:var(--cyan-dim);color:var(--cyan)}
+.num.unverified{border-bottom-style:dotted;border-bottom-color:var(--amber);
+  cursor:help}
+.num.unverified:hover{background:var(--amber-dim);color:var(--amber)}
+.traceline{font-family:var(--m);font-size:9.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink3);margin:-4px 0 10px;
+  display:flex;gap:7px;align-items:center}
+.traceline i{width:16px;height:0;border-top:1.5px solid var(--cyan);
+  display:inline-block}
+.traceline.warn i{border-top-color:var(--amber);border-top-style:dotted}
+.traceline.warn{color:var(--amber)}
+
 .tags{display:flex;gap:6px;flex-wrap:wrap;font-family:var(--m);font-size:9.5px;
   letter-spacing:.08em;color:var(--ink3);text-transform:uppercase;
   align-items:center;margin-top:2px}
@@ -141,35 +246,85 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .tag.hi{color:var(--cyan);border-color:currentColor}
 .tag.md{color:var(--amber);border-color:currentColor}
 .tag.pv{color:var(--magenta);border-color:currentColor}
+.tag.gd{color:var(--green);border-color:currentColor}
 .assume{font-family:var(--m);font-size:10.5px;color:var(--amber);margin-top:6px}
 
-.verdict{font-family:var(--d);font-weight:800;font-size:27px;letter-spacing:-.02em;
-  line-height:1;margin:15px 0 11px;display:flex;align-items:center;gap:11px}
+/* ------------------------------------------------------------ rule trace */
+/* All seven rules, always. Showing only the one that failed invites the
+   question "did you check the others?" -- so we show that we did, including
+   the ones that are non-binding on this dataset. */
+.rules{display:flex;gap:5px;flex-wrap:wrap;margin:13px 0 2px}
+.rule{font-family:var(--m);font-size:9.5px;letter-spacing:.06em;padding:3px 7px;
+  border-radius:3px;border:1px solid var(--line2);color:var(--ink3);
+  display:flex;gap:5px;align-items:center;white-space:nowrap}
+.rule .d{width:5px;height:5px;border-radius:50%;background:var(--ink3)}
+.rule.pass{color:var(--green);border-color:var(--green-dim)}
+.rule.pass .d{background:var(--green);box-shadow:0 0 6px var(--green)}
+.rule.fail{color:var(--red);border-color:currentColor;background:var(--red-dim)}
+.rule.fail .d{background:var(--red);box-shadow:0 0 6px var(--red)}
+.rule.nb{color:var(--ink3);border-style:dashed}
+.rule.nb .d{background:transparent;border:1px solid var(--ink3)}
+
+.verdict{font-family:var(--d);font-weight:800;font-size:28px;letter-spacing:-.022em;
+  line-height:1;margin:16px 0 12px;display:flex;align-items:center;gap:12px}
 .verdict .gl{font-size:15px}
 .verdict.no{color:var(--red)} .verdict.yes{color:var(--green)}
 
 .bind{font-family:var(--m);font-size:12px;background:var(--panel2);
-  border:1px solid var(--line);border-radius:3px;padding:10px 13px;
-  display:flex;flex-wrap:wrap;gap:5px 20px;margin-bottom:12px;
+  border:1px solid var(--line);border-radius:4px;padding:10px 13px;
+  display:flex;flex-wrap:wrap;gap:5px 22px;margin-bottom:12px;
   font-variant-numeric:tabular-nums}
 .bind span{white-space:nowrap}
 .bind .l{color:var(--ink3);margin-right:5px}
 .bind .v{font-weight:500}
 .bind .v.bad{color:var(--red)}
 
-.gauge{height:9px;background:var(--panel2);border:1px solid var(--line);
+.gauge{height:10px;background:var(--panel2);border:1px solid var(--line);
   border-radius:2px;position:relative;overflow:hidden;margin-bottom:14px}
 .gauge i{position:absolute;top:0;bottom:0;display:block}
-.gauge .fill{left:0;width:0;background:var(--cyan);opacity:.55}
-.gauge .over{width:0;background:var(--red);opacity:.8}
+.gauge .fill{left:0;width:0;background:var(--cyan);opacity:.6}
+.gauge .over{width:0;background:var(--red);opacity:.82}
 .gauge .tick{top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.9}
 
-.issue{background:var(--red-dim);border-left:2px solid var(--red);padding:7px 11px;
+.issue{background:var(--red-dim);border-left:2px solid var(--red);padding:8px 11px;
   margin-bottom:6px;border-radius:0 3px 3px 0;font-family:var(--m);font-size:12px;
-  line-height:1.5}
+  line-height:1.55}
 .sect{font-family:var(--m);font-size:9.5px;letter-spacing:.13em;color:var(--ink3);
-  text-transform:uppercase;margin:17px 0 8px;display:flex;gap:8px;align-items:center}
+  text-transform:uppercase;margin:18px 0 9px;display:flex;gap:8px;align-items:center}
 .sect::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* ----------------------------------------------------------- cost ladder */
+/* Cover options as a ladder rather than a table. A controller decides on
+   relative cost far faster than on absolute rupees, and the ruled-out crew
+   sit on the same axis so "why not him" is answered in the same glance. */
+.ladder{display:flex;flex-direction:column;gap:3px}
+.rung{display:grid;grid-template-columns:26px 78px 1fr 96px;gap:11px;
+  align-items:center;padding:6px 8px;border-radius:4px;
+  transition:background .15s}
+.rung:hover{background:var(--panel2)}
+.rung .rk{font-family:var(--m);font-size:11px;color:var(--ink3);text-align:center}
+.rung .who{font-family:var(--m);font-size:12.5px}
+.rung .track{height:19px;background:var(--panel2);border-radius:3px;
+  position:relative;overflow:hidden}
+.rung .fill{position:absolute;left:0;top:0;bottom:0;width:0;
+  background:var(--cyan);opacity:.34}
+.rung .lbl{position:absolute;left:8px;top:0;bottom:0;display:flex;
+  align-items:center;font-size:11.5px;color:var(--ink2);white-space:nowrap}
+.rung .amt{font-family:var(--m);font-size:12.5px;text-align:right;
+  font-variant-numeric:tabular-nums}
+.rung.best{background:var(--green-dim)}
+.rung.best .fill{background:var(--green);opacity:.4}
+.rung.best .rk,.rung.best .amt{color:var(--green);font-weight:600}
+.rung.cancel .fill{background:var(--red);opacity:.34}
+.rung.cancel .amt{color:var(--red)}
+.rung.out{opacity:.62}
+.rung.out .who{color:var(--ink3);text-decoration:line-through}
+.rung.out .track{background:transparent}
+.rung.out .lbl{color:var(--ink3);left:0;font-family:var(--m);font-size:11px}
+.wbtn{font-family:var(--m);font-size:9.5px;letter-spacing:.06em;color:var(--ink3);
+  border:1px solid var(--line2);border-radius:2px;padding:1px 5px;
+  transition:color .15s,border-color .15s;margin-left:8px}
+.wbtn:hover{color:var(--amber);border-color:var(--amber)}
 
 table{width:100%;border-collapse:collapse;font-size:12.5px}
 th{text-align:left;font-family:var(--m);font-size:9px;letter-spacing:.1em;
@@ -183,19 +338,13 @@ td.n{font-family:var(--m);text-align:right;font-variant-numeric:tabular-nums;
 tr.win td{background:var(--green-dim)}
 tr.win td:first-child{box-shadow:inset 2px 0 0 var(--green)}
 tr.bad td{background:var(--red-dim)}
-.tie{display:inline-block;min-width:15px;text-align:center;font-family:var(--m);
-  font-size:9.5px;color:var(--ink3);border:1px solid var(--line2);border-radius:2px}
-.wbtn{font-family:var(--m);font-size:9.5px;letter-spacing:.06em;color:var(--ink3);
-  border:1px solid var(--line2);border-radius:2px;padding:1px 5px;
-  transition:color .15s,border-color .15s}
-.wbtn:hover{color:var(--amber);border-color:var(--amber)}
-.scrollx{overflow-x:auto;margin:0 -20px;padding:0 20px}
+.scrollx{overflow-x:auto;margin:0 -21px;padding:0 21px}
 .ruled td{color:var(--ink2)}
 .ruled td.m{color:var(--ink)}
 .more{font-family:var(--m);font-size:10.5px;color:var(--ink3);padding-top:7px}
 
 .draft{font-family:var(--m);font-size:12.5px;line-height:1.65;white-space:pre-wrap;
-  background:var(--panel2);border:1px solid var(--line);border-radius:3px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:4px;
   padding:14px 16px}
 .lock{font-family:var(--m);font-size:9.5px;letter-spacing:.1em;color:var(--green);
   text-transform:uppercase;margin-top:8px}
@@ -210,36 +359,98 @@ tr.bad td{background:var(--red-dim)}
   color:var(--ink2);transition:border-color .15s,color .15s}
 .chip:hover{border-color:var(--cyan);color:var(--cyan)}
 
-.foot{border-top:1px solid var(--line);background:var(--panel2);padding:8px 20px;
+.foot{border-top:1px solid var(--line);background:var(--panel2);padding:8px 21px;
   display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-family:var(--m);
   font-size:9.5px;letter-spacing:.07em;color:var(--ink3);text-transform:uppercase}
 .foot button{color:var(--ink3);transition:color .15s}
 .foot button:hover{color:var(--cyan)}
 
-#composer{border-top:1px solid var(--line);background:var(--panel);padding:13px 26px 15px}
-#cwrap{max-width:840px;margin:0 auto;display:flex;gap:9px;align-items:center}
-#q{flex:1;background:var(--panel2);border:1px solid var(--line2);border-radius:4px;
+#composer{border-top:1px solid var(--line);background:var(--panel);
+  padding:13px 26px 15px}
+#cwrap{max-width:860px;margin:0 auto;display:flex;gap:9px;align-items:center}
+#q{flex:1;background:var(--panel2);border:1px solid var(--line2);border-radius:5px;
   padding:12px 15px;color:var(--ink);font:inherit;font-size:14.5px;
   transition:border-color .18s,box-shadow .18s}
 #q:focus{outline:0;border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-dim)}
 #q::placeholder{color:var(--ink3)}
-#send{background:var(--cyan);color:#04161f;font-weight:600;border-radius:4px;
-  padding:12px 20px;font-family:var(--d);transition:transform .14s var(--ez),opacity .15s}
+#send{background:var(--cyan);color:#04161f;font-weight:600;border-radius:5px;
+  padding:12px 21px;font-family:var(--d);
+  transition:transform .14s var(--spring),opacity .15s}
 :root[data-theme="light"] #send{color:#fff}
 #send:hover:not(:disabled){transform:translateY(-1px)}
 #send:disabled{opacity:.4;cursor:default}
-#hint{max-width:840px;margin:7px auto 0;font-family:var(--m);font-size:9.5px;
+#hint{max-width:860px;margin:7px auto 0;font-family:var(--m);font-size:9.5px;
   letter-spacing:.06em;color:var(--ink3);text-transform:uppercase;display:flex;
   gap:14px;flex-wrap:wrap}
 kbd{font-family:var(--m);background:var(--panel3);border:1px solid var(--line2);
   border-radius:2px;padding:0 4px;color:var(--ink2)}
 
+/* --------------------------------------------------------------- ledger */
 #evi{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;
-  padding:16px 16px 40px}
+  padding:16px 16px 44px}
 #evi table{font-size:11.5px}
-#evi td{padding:5px 7px}
+#evi td{padding:6px 7px}
+#evi tr.lit td{background:var(--cyan-dim)}
+#evi tr.lit td:first-child{box-shadow:inset 2px 0 0 var(--cyan)}
 .ev-src{font-family:var(--m);font-size:10px;color:var(--ink3);line-height:1.4}
 .ev-empty{color:var(--ink3);font-size:12.5px;padding:16px 0}
+#evStat{font-family:var(--m);font-size:9.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink3);margin-bottom:10px;
+  display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------------------------------------------------- overlays: ⌘K, proof */
+.veil{position:fixed;inset:0;z-index:70;background:rgba(3,7,11,.72);
+  backdrop-filter:blur(3px);display:none}
+.veil.on{display:block}
+:root[data-theme="light"] .veil{background:rgba(20,30,40,.42)}
+
+#pal{position:absolute;left:50%;top:16vh;transform:translateX(-50%);
+  width:min(620px,92vw);background:var(--panel);border:1px solid var(--line2);
+  border-radius:8px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+#palIn{width:100%;background:var(--panel2);border:0;border-bottom:1px solid var(--line);
+  padding:14px 17px;color:var(--ink);font:inherit;font-size:15px}
+#palIn:focus{outline:0}
+#palList{max-height:52vh;overflow-y:auto;padding:6px}
+.pi{display:flex;gap:10px;align-items:center;padding:8px 11px;border-radius:5px;
+  width:100%;text-align:left;font-size:13.5px;color:var(--ink2)}
+.pi.sel{background:var(--panel2);color:var(--ink)}
+.pi .kind{font-family:var(--m);font-size:8.5px;letter-spacing:.1em;padding:1px 5px;
+  border-radius:2px;border:1px solid var(--line2);color:var(--ink3);
+  text-transform:uppercase}
+.pi.sel .kind{border-color:var(--cyan);color:var(--cyan)}
+
+#proof{position:absolute;left:50%;top:8vh;transform:translateX(-50%);
+  width:min(880px,94vw);max-height:84vh;overflow-y:auto;background:var(--panel);
+  border:1px solid var(--line2);border-radius:8px;padding:26px 28px 32px;
+  box-shadow:0 24px 70px rgba(0,0,0,.5)}
+#proof h3{font-family:var(--d);font-weight:800;font-size:23px;letter-spacing:-.02em;
+  margin-bottom:5px}
+#proof .sub{color:var(--ink2);font-size:13.5px;margin-bottom:20px;max-width:66ch}
+.tierrow{display:grid;grid-template-columns:92px 1fr 96px;gap:12px;
+  align-items:center;padding:5px 0;font-size:12.5px}
+.tierrow .nm{font-family:var(--m);font-size:11px;color:var(--ink2)}
+.tierrow .bar{height:17px;background:var(--panel2);border-radius:3px;display:flex;
+  overflow:hidden}
+.tierrow .bar i{display:block;height:100%;width:0}
+.tierrow .bar .ok{background:var(--green);opacity:.66}
+.tierrow .bar .rb{background:var(--magenta);opacity:.55}
+.tierrow .bar .wr{background:var(--red)}
+.tierrow .ct{font-family:var(--m);font-size:11px;text-align:right;color:var(--ink3)}
+.finding{border:1px solid var(--line);border-radius:5px;margin-bottom:8px;
+  overflow:hidden}
+.finding > button{width:100%;text-align:left;padding:10px 13px;display:flex;
+  gap:10px;align-items:center;font-size:13px}
+.finding .cls{font-family:var(--m);font-size:9px;letter-spacing:.1em;padding:1px 5px;
+  border-radius:2px;border:1px solid currentColor}
+.finding .cls.A{color:var(--cyan)} .finding .cls.B{color:var(--red)}
+.finding .cls.C{color:var(--amber)}
+.finding .det{display:none;padding:0 13px 13px;font-size:12.5px;color:var(--ink2);
+  line-height:1.6}
+.finding.open .det{display:block}
+.finding .det b{color:var(--ink)}
+#proofClose{position:sticky;top:0;float:right;font-family:var(--m);font-size:10px;
+  letter-spacing:.1em;color:var(--ink3)}
+#proofClose:hover{color:var(--red)}
 
 .spin{display:inline-block;width:11px;height:11px;border:1.5px solid var(--line2);
   border-top-color:var(--cyan);border-radius:50%;animation:sp .7s linear infinite;
@@ -252,6 +463,17 @@ kbd{font-family:var(--m);background:var(--panel3);border:1px solid var(--line2);
 }
 </style></head>
 <body>
+
+<!-- Cold open. Real figures, fetched. Dismissed by any key or click, and
+     never shown at all when the viewer asked for reduced motion. -->
+<div id="boot"><div id="bootIn">
+  <div id="bootTitle">Crew Ops Advisor</div>
+  <div id="bootSub">dCortex Air &middot; pre-flight self test</div>
+  <div id="bootLines"></div>
+  <div id="bootBar"><i></i></div>
+  <div id="bootSkip">Press any key to skip</div>
+</div></div>
+
 <div id="app">
   <div id="bar">
     <span><b>dCORTEX AIR</b> &middot; CREW OPS</span>
@@ -260,13 +482,17 @@ kbd{font-family:var(--m);background:var(--panel3);border:1px solid var(--line2);
     <span class="sep"></span>
     <span>SNAP <b>2026-09-14 18:00Z</b></span>
     <span id="fleet">&middot; &middot; &middot;</span>
-    <span id="score">
+    <span id="right">
       <span id="llm"><span class="led off"></span>MODEL</span>
       <span class="sep"></span>
-      <span id="scoreboard">SCOREBOARD <span class="spin"></span></span>
+      <button id="proofBtn">SCOREBOARD <span class="spin"></span></button>
+      <span class="sep"></span>
+      <button id="palBtn" title="Command palette">&#8984;K</button>
       <button id="themeBtn" title="Toggle theme">&#9689;</button>
     </span>
   </div>
+
+  <div id="layers"></div>
 
   <div id="cols">
     <aside id="board">
@@ -279,10 +505,18 @@ kbd{font-family:var(--m);background:var(--panel3);border:1px solid var(--line2);
     <main id="desk">
       <div id="feed"><div id="feedInner">
         <div id="hero">
-          <h1>Who flies DX412?</h1>
-          <p>It's 5 a.m. and a captain just called in sick. Ask in plain language &mdash;
-             <span class="k">the model translates, the kernel decides.</span>
-             Every number below is computed, never written.</p>
+          <h1>A captain just called in sick. Now what?</h1>
+          <p>Ask in plain language. <span class="k">The model translates; the
+             kernel decides.</span> Every figure below is computed by the rules
+             engine and underlined so you can click it and see exactly which
+             fact it came from &mdash; nothing in an answer is written by a
+             language model.</p>
+          <div id="heroStats">
+            <span class="g"><b id="hsKernel">&mdash;</b>answer key exact</span>
+            <span class="c"><b id="hsRoute">&mdash;</b>questions routed</span>
+            <span><b id="hsRules">7</b>rules, all evaluated</span>
+            <span><b id="hsMs">&mdash;</b>typical answer</span>
+          </div>
         </div>
       </div></div>
       <div id="composer">
@@ -292,7 +526,8 @@ kbd{font-family:var(--m);background:var(--panel3);border:1px solid var(--line2);
           <button id="send">Ask</button>
         </div>
         <div id="hint">
-          <span><kbd>/</kbd> focus</span><span><kbd>E</kbd> evidence</span>
+          <span><kbd>/</kbd> focus</span><span><kbd>&#8984;K</kbd> palette</span>
+          <span><kbd>E</kbd> evidence</span>
           <span><kbd>Esc</kbd> exit what-if</span><span><kbd>&uarr;</kbd> last question</span>
         </div>
       </div>
@@ -300,13 +535,31 @@ kbd{font-family:var(--m);background:var(--panel3);border:1px solid var(--line2);
 
     <aside id="evi">
       <div class="grp"><h2>Evidence ledger</h2>
+        <div id="evStat"></div>
         <div id="eviBody" class="ev-empty">Every number the rules engine touched,
-          including the intermediates. This is what the narrator is allowed to
-          say &mdash; and nothing else.</div>
+          including the intermediates and the unit conversions. This is the only
+          thing the narrator is shown &mdash; and the allow-list it is checked
+          against afterwards.</div>
       </div>
     </aside>
   </div>
 </div>
+
+<div class="veil" id="palVeil"><div id="pal">
+  <input id="palIn" placeholder="Type a question, or a command…" autocomplete="off">
+  <div id="palList"></div>
+</div></div>
+
+<div class="veil" id="proofVeil"><div id="proof">
+  <button id="proofClose">CLOSE &times;</button>
+  <h3>The receipts</h3>
+  <p class="sub">Two different claims, measured separately and published
+     separately. The first says the arithmetic is right. The second says a
+     typed sentence reaches the capability that owns it. A system can pass
+     either one while failing the other, so a single blended number would
+     hide exactly the failure you care about.</p>
+  <div id="proofBody"><span class="spin"></span></div>
+</div></div>
 
 <script>
 'use strict';
@@ -319,7 +572,7 @@ const inr = n => '₹' + Number(n).toLocaleString('en-IN');
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* Motion via the Web Animations API only. No runtime dependency, on purpose:
-   a live demo must not be able to fail because a CDN is slow. */
+   a live demo must not be able to fail because a CDN was slow. */
 function enter(node,i){ if(REDUCED) return;
   node.animate([{opacity:0,transform:'translateY(9px)'},{opacity:1,transform:'none'}],
     {duration:420,delay:(i||0)*32,easing:'cubic-bezier(.22,1.2,.36,1)',fill:'backwards'}); }
@@ -330,34 +583,113 @@ function stagger(nodes,step){ if(REDUCED) return;
 function countUp(node,to,fmt){
   if(REDUCED||!isFinite(to)){ node.textContent=fmt(to); return; }
   const t0=performance.now();
-  (function tick(t){ const p=Math.min(1,(t-t0)/620), e=1-Math.pow(1-p,3);
+  (function tick(t){ const p=Math.min(1,(t-t0)/640), e=1-Math.pow(1-p,3);
     node.textContent=fmt(to*e);
     if(p<1) requestAnimationFrame(tick); else node.textContent=fmt(to); })(t0);
 }
-function grow(node,pct){
+function grow(node,pct,delay){
   if(REDUCED){ node.style.width=pct+'%'; return; }
   node.animate([{width:'0%'},{width:pct+'%'}],
-    {duration:700,easing:'cubic-bezier(.22,1.2,.36,1)',fill:'forwards'});
+    {duration:720,delay:delay||0,easing:'cubic-bezier(.22,1.2,.36,1)',fill:'forwards'});
+}
+function pulse(node){
+  if(REDUCED||!node) return;
+  node.animate([{boxShadow:'0 0 0 0 var(--cyan)'},{boxShadow:'0 0 0 7px transparent'}],
+    {duration:520,easing:'ease-out'});
 }
 
 const SESSION = 'ui-' + Math.random().toString(36).slice(2,10);
-let HISTORY = [], HIST_I = -1, WHATIF = [];
+let HISTORY = [], HIST_I = -1, WHATIF = [], LAST_FACTS = [], EXAMPLES = [];
+
+/* ======================================================================
+   cold open
+   ====================================================================== */
+
+const BOOT = [
+  {k:'snapshot',            v:'2026-09-14 18:00Z'},
+  {k:'fleet',               v:'…', id:'fleet'},
+  {k:'rulebook',            v:'7 rules parsed'},
+  {k:'oracle parity',       v:'…', id:'kernel'},
+  {k:'language routing',    v:'…', id:'route'},
+  {k:'numeric containment', v:'ledger-bound'},
+  {k:'planner',             v:'…', id:'model'},
+];
+
+function boot(){
+  const host = $('#bootLines');
+  const nodes = {};
+  BOOT.forEach((b,i)=>{
+    const n = el('div','bl','<span class="k">'+esc(b.k)+'</span>'+
+      '<span class="v">'+esc(b.v)+'</span><span class="st pend">····</span>');
+    host.appendChild(n);
+    if(b.id) nodes[b.id]=n;
+    if(REDUCED){ n.style.opacity=1; n.querySelector('.st').className='st ok';
+                 n.querySelector('.st').textContent='OK'; return; }
+    n.animate([{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'none'}],
+      {duration:260,delay:120+i*95,easing:'ease-out',fill:'forwards'});
+    setTimeout(()=>{ const s=n.querySelector('.st');
+      s.className='st ok'; s.textContent='OK'; }, 380+i*95);
+  });
+  if(!REDUCED) grow($('#bootBar i'),100,120);
+  return nodes;
+}
+
+const BOOTN = boot();
+function bootSet(id,text,bad){
+  const n = BOOTN[id]; if(!n) return;
+  n.querySelector('.v').textContent = text;
+  if(bad){ const s=n.querySelector('.st'); s.className='st no'; s.textContent='CHECK'; }
+}
+function dismissBoot(){
+  const b=$('#boot'); if(b.classList.contains('gone')) return;
+  b.classList.add('gone');
+  $('#app').classList.add('up');
+  if(REDUCED){ b.remove(); $('#q').focus(); return; }
+  b.animate([{opacity:1},{opacity:0}],{duration:420,easing:'ease-in',fill:'forwards'})
+   .onfinish = ()=>{ b.remove(); $('#q').focus(); };
+}
+addEventListener('keydown', dismissBoot, {once:true});
+$('#boot').addEventListener('click', dismissBoot);
+setTimeout(dismissBoot, REDUCED ? 0 : 2350);
+
+/* ======================================================================
+   startup data
+   ====================================================================== */
 
 fetch('/api/health').then(r=>r.json()).then(d=>{
-  $('#fleet').textContent = '· '+d.flights+' FLIGHTS · '+d.crew+' CREW · '+d.pairings+' TRIPS';
-  $('#llm').innerHTML = d.model
-    ? '<span class="led"></span>'+esc(String(d.model).split(':')[0].toUpperCase())
+  const f = d.flights+' flights · '+d.crew+' crew · '+d.pairings+' trips';
+  $('#fleet').textContent = '· '+f.toUpperCase();
+  bootSet('fleet', f);
+  const label = d.model ? String(d.model).split(':')[0] : null;
+  bootSet('model', label ? label+' + deterministic index' : 'deterministic index');
+  $('#llm').innerHTML = label
+    ? '<span class="led"></span>'+esc(label.toUpperCase())
     : '<span class="led off"></span>RULES ONLY';
-}).catch(()=>{});
+}).catch(()=>{ bootSet('fleet','unreachable',true); });
 
 fetch('/api/eval').then(r=>r.json()).then(d=>{
-  const t=d.totals;
-  $('#scoreboard').innerHTML = '<b>'+t.CORRECT+'</b> CORRECT · <span class="'+
+  const t=d.totals, tot=t.CORRECT+t.WRONG+t.ABSTAINED;
+  bootSet('kernel', t.CORRECT+'/'+tot+' exact, '+t.WRONG+' wrong', t.WRONG>0);
+  $('#proofBtn').innerHTML = '<b>'+t.CORRECT+'</b> CORRECT · <span class="'+
     (t.WRONG?'':'wrong0')+'"><b>'+t.WRONG+'</b> WRONG</span>';
-}).catch(()=>{ $('#scoreboard').textContent='SCOREBOARD —'; });
+  countUp($('#hsKernel'), t.CORRECT, x=>Math.round(x)+'/'+tot);
+}).catch(()=>{ $('#proofBtn').textContent='SCOREBOARD —';
+               bootSet('kernel','unreachable',true); });
+
+fetch('/api/routing').then(r=>r.ok?r.json():null).then(d=>{
+  if(!d) throw 0;
+  bootSet('route', d.correct_tool+'/'+d.total+' reach the right capability');
+  countUp($('#hsRoute'), d.correct_tool, x=>Math.round(x)+'/'+d.total);
+}).catch(()=>{ bootSet('route','not measured'); $('#hsRoute').textContent='—'; });
 
 fetch('/api/brief').then(r=>r.json()).then(renderBoard).catch(()=>{});
-fetch('/api/examples').then(r=>r.json()).then(renderExamples).catch(()=>{});
+fetch('/api/examples').then(r=>r.json()).then(list=>{
+  EXAMPLES=list; renderExamples(list);
+}).catch(()=>{});
+
+/* ======================================================================
+   morning board
+   ====================================================================== */
 
 function renderBoard(b){
   const A=$('#alerts');
@@ -408,6 +740,10 @@ function renderExamples(list){
   });
 }
 
+/* ======================================================================
+   input
+   ====================================================================== */
+
 $('#send').onclick = ()=>ask($('#q').value);
 $('#q').addEventListener('keydown', e=>{
   if(e.key==='Enter') ask($('#q').value);
@@ -415,16 +751,26 @@ $('#q').addEventListener('keydown', e=>{
     HIST_I=Math.max(0,HIST_I-1); if(HISTORY[HIST_I]) $('#q').value=HISTORY[HIST_I]; }
 });
 addEventListener('keydown', e=>{
-  if(e.key==='/' && document.activeElement!==$('#q')){ e.preventDefault(); $('#q').focus(); }
-  else if(e.key==='Escape'){ if(WHATIF.length) resetWhatIf(); else $('#q').blur(); }
-  else if((e.key==='e'||e.key==='E') && document.activeElement!==$('#q'))
-    $('#cols').classList.toggle('ev');
+  const typing = document.activeElement===$('#q') || document.activeElement===$('#palIn');
+  if((e.key==='k'||e.key==='K') && (e.metaKey||e.ctrlKey)){ e.preventDefault(); openPal(); }
+  else if(e.key==='Escape'){
+    if($('#palVeil').classList.contains('on')) closePal();
+    else if($('#proofVeil').classList.contains('on')) closeProof();
+    else if(WHATIF.length) resetWhatIf();
+    else $('#q').blur();
+  }
+  else if(typing) return;
+  else if(e.key==='/'){ e.preventDefault(); $('#q').focus(); }
+  else if(e.key==='e'||e.key==='E') $('#cols').classList.toggle('ev');
 });
 $('#themeBtn').onclick = ()=>{ const r=document.documentElement;
   r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'; };
+$('#palBtn').onclick = openPal;
+$('#proofBtn').onclick = openProof;
 
 async function ask(q){
   q=(q||'').trim(); if(!q) return;
+  closePal(); dismissBoot();
   HISTORY.push(q); HIST_I=HISTORY.length;
   $('#q').value=''; $('#send').disabled=true;
 
@@ -437,6 +783,7 @@ async function ask(q){
   $('#feedInner').appendChild(turn); enter(turn);
   $('#feed').scrollTop=$('#feed').scrollHeight;
 
+  const t0=performance.now();
   let d;
   try{
     const r=await fetch('/api/ask',{method:'POST',
@@ -448,10 +795,108 @@ async function ask(q){
   card.innerHTML='';
   renderCard(card,d);
   renderEvidence(d);
+  syncLayers(d);
+  if(d && d.elapsed_ms!=null) $('#hsMs').textContent=Math.round(d.elapsed_ms)+' ms';
   $('#send').disabled=false;
   $('#feed').scrollTop=$('#feed').scrollHeight;
   $('#q').focus();
 }
+
+/* ======================================================================
+   numeric trace -- the thesis, made visible
+   ====================================================================== */
+
+/* Rebuild the allow-list the Python guard uses, so the underline in the
+   browser means the same thing as the check on the server: a number is
+   traceable if it appears in the ledger as written, as a rounded value, with
+   thousands separators, or as the hour/minute decomposition of an hours
+   figure. Anything else gets an amber dotted underline and says so. */
+function allowedNumbers(facts){
+  const S=new Set();
+  const add=x=>{ if(x==null||x==='') return; S.add(String(x)); };
+  (facts||[]).forEach(f=>{
+    const raw=f.value, n=Number(raw);
+    add(raw);
+    if(!isFinite(n)) return;
+    add(String(n));
+    add(n.toLocaleString('en-IN'));
+    add(n.toLocaleString('en-US'));
+    [0,1,2].forEach(p=>add(n.toFixed(p)));
+    if(Math.abs(n-Math.round(n))<1e-9) add(String(Math.round(n)));
+    // an hours figure is routinely spoken as hours and minutes
+    const H=Math.floor(Math.abs(n)), M=Math.round((Math.abs(n)-H)*60);
+    add(String(H)); if(M) add(String(M));
+    add(String(Math.round(Math.abs(n)*60)));
+  });
+  return S;
+}
+
+/* Alternation order is the whole trick. The structured tokens come FIRST, so
+   `C-3310`, `2026-09-16`, `08:00` and `A320` are consumed whole and never
+   reach the bare-number branch. Matching plain digits first instead flagged
+   "3310", "2026", "09" and "320" as untraced figures -- 56 false alarms
+   across ten real answers, which would have made the guard look broken while
+   it was in fact working. This mirrors the _STRIP list the Python guard
+   applies before it counts anything. */
+const NUMRE = new RegExp([
+  'C-\\d{4}', 'P-\\d{4}', 'DX\\d{3}(?:-\\d{4}-\\d{2}-\\d{2})?', 'VT-DX[A-F]',
+  'RULE-[A-Z]+-\\d+', '20\\d{2}-\\d{2}-\\d{2}', '\\d{1,2}:\\d{2}',
+  'A320', 'ATR ?72',
+  '\\d[\\d,]*(?:\\.\\d+)?'
+].join('|'), 'g');
+const BARE = /^\d[\d,]*(?:\.\d+)?$/;
+
+function traceHTML(text, facts){
+  const ok = allowedNumbers(facts);
+  const byNum = new Map();
+  (facts||[]).forEach(f=>{
+    const n=Number(f.value);
+    [String(f.value), String(n), isFinite(n)?n.toLocaleString('en-IN'):null,
+     isFinite(n)?n.toFixed(2):null, isFinite(n)?String(Math.round(n)):null]
+      .forEach(k=>{ if(k && !byNum.has(k)) byNum.set(k,f.key); });
+  });
+  let traced=0, loose=0;
+  const html = esc(text).replace(NUMRE, m=>{
+    if(!BARE.test(m)) return m;           // an identifier, a date, a clock time
+    const bare = m.replace(/,/g,'');
+    const trimmed = bare.replace(/^0+(?=\d)/,'');
+    const good = ok.has(m) || ok.has(bare) || ok.has(trimmed);
+    if(good){ traced++;
+      const key = byNum.get(m) || byNum.get(bare) || byNum.get(trimmed) || '';
+      return '<span class="num" data-fact="'+esc(key)+'" tabindex="0" title="'+
+             (key?'from '+esc(key)+' — click to show it in the ledger'
+                 :'traced to the evidence ledger')+'">'+m+'</span>';
+    }
+    loose++;
+    return '<span class="num unverified" title="not in the evidence ledger for '+
+           'this answer">'+m+'</span>';
+  });
+  return {html:html, traced:traced, loose:loose};
+}
+
+function wireTrace(scope){
+  scope.querySelectorAll('.num[data-fact]').forEach(n=>{
+    const go=()=>{
+      const key=n.dataset.fact; if(!key) return;
+      $('#cols').classList.add('ev');
+      scope.querySelectorAll('.num.lit').forEach(x=>x.classList.remove('lit'));
+      n.classList.add('lit');
+      const rows=$('#eviBody').querySelectorAll('tr[data-fact]');
+      let hit=null;
+      rows.forEach(r=>{ r.classList.remove('lit');
+        if(r.dataset.fact===key){ r.classList.add('lit'); hit=r; } });
+      if(hit){ hit.scrollIntoView({block:'center',
+                 behavior:REDUCED?'auto':'smooth'}); pulse(hit); }
+    };
+    n.addEventListener('click', go);
+    n.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){
+      e.preventDefault(); go(); } });
+  });
+}
+
+/* ======================================================================
+   the answer card
+   ====================================================================== */
 
 function renderCard(card,d){
   const body=el('div','body'); card.appendChild(body);
@@ -483,13 +928,28 @@ function renderCard(card,d){
   if(tool==='check_legality') card.className='card '+(p.legal?'yes':'no');
   if(tool==='draft_notification') card.className='card drafted';
 
-  body.appendChild(el('div','lede',esc(d.explanation)));
+  const tr = traceHTML(d.explanation||'', d.evidence);
+  const lede = el('div','lede', tr.html);
+  body.appendChild(lede);
+  wireTrace(lede);
+
+  if(tr.traced || tr.loose){
+    const warn = tr.loose>0;
+    body.appendChild(el('div','traceline'+(warn?' warn':''),
+      '<i></i>'+(warn
+        ? tr.loose+' figure'+(tr.loose>1?'s':'')+' not in the ledger · '+
+          tr.traced+' traced'
+        : 'all '+tr.traced+' figure'+(tr.traced>1?'s':'')+
+          ' trace to the evidence ledger — click one')));
+  }
 
   const steps=(d.plan&&d.plan.steps)||[];
+  const chain = d.plan && d.plan.conjunctive
+    ? '<span class="tag pv">TWO-PART ANSWER</span>'
+    : (steps.length>1?'<span class="tag pv">'+steps.length+'-STEP CHAIN</span>':'');
   body.appendChild(el('div','tags',
     '<span class="tag hi">T'+d.tier+'</span>'+
-    '<span class="tag">'+esc(tool)+'</span>'+
-    (steps.length>1?'<span class="tag pv">'+steps.length+'-STEP CHAIN</span>':'')+
+    '<span class="tag">'+esc(tool)+'</span>'+ chain +
     '<span>'+Math.round(d.elapsed_ms)+' MS</span>'+
     '<span class="tag '+(computed?'hi':'md')+'">'+(computed?'COMPUTED':'MODEL-DRAFTED')+'</span>'+
     '<span>PLANNED BY '+esc(String((d.plan&&d.plan.parsed_by)||'-').toUpperCase())+'</span>'+
@@ -499,8 +959,12 @@ function renderCard(card,d){
   ((d.resolved&&d.resolved.assumptions)||[]).forEach(a=>
     body.appendChild(el('div','assume','ASSUMED · '+esc(a))));
 
+  renderRules(body,p);
+
   if(steps.length>1){
-    body.appendChild(el('div','sect','Plan'));
+    body.appendChild(el('div','sect', d.plan.conjunctive
+      ? 'Two questions in one sentence — both answered'
+      : 'Plan'));
     const t=el('table'); t.innerHTML='<tbody>'+steps.map((s,i)=>
       '<tr><td class="m">'+(i+1)+'</td><td class="m">'+esc(s.tool)+'</td><td>'+
       esc(JSON.stringify(s.args))+'</td></tr>').join('')+'</tbody>';
@@ -508,6 +972,10 @@ function renderCard(card,d){
   }
 
   if(RENDER[tool]) RENDER[tool](body,p,d);
+  (p.also||[]).forEach(o=>{
+    body.appendChild(el('div','sect','Also asked · '+esc(o.tool)));
+    if(RENDER[o.tool]) RENDER[o.tool](body,o.result,d);
+  });
 
   const foot=el('div','foot');
   foot.appendChild(el('span','', 'EVIDENCE '+((d.evidence||[]).length)+' FACTS'));
@@ -522,6 +990,31 @@ function renderCard(card,d){
   foot.appendChild(bj);
   card.appendChild(foot);
 }
+
+/* Every rule, every time. Showing only the rule that failed invites "did you
+   check the others?", and the honest answer -- yes, and two of them cannot
+   bind on this dataset -- is more persuasive than silence. */
+function renderRules(body,p){
+  const all = p.rules_evaluated || p.rules_checked;
+  if(!all || !all.length) return;
+  const failed = new Set();
+  (p.issues||[]).forEach(s=>{ const m=/RULE-[A-Z]+-\d+/.exec(s); if(m) failed.add(m[0]); });
+  const nb = new Set(p.non_binding||[]);
+  const row = el('div','rules');
+  all.forEach(r=>{
+    const state = failed.has(r) ? 'fail' : (nb.has(r) ? 'nb' : 'pass');
+    const n = el('span','rule '+state,'<span class="d"></span>'+esc(r));
+    n.title = state==='fail' ? 'breached' :
+              state==='nb' ? 'evaluated; cannot bind on this dataset' : 'clear';
+    row.appendChild(n);
+  });
+  body.appendChild(row);
+  stagger(row.children, 34);
+}
+
+/* ======================================================================
+   per-capability renderers
+   ====================================================================== */
 
 const RENDER={};
 
@@ -547,44 +1040,56 @@ RENDER.check_legality=(b,p,d)=>{
   }
   (p.issues||[]).forEach((i,k)=>{ const n=el('div','issue',esc(i)); b.appendChild(n); enter(n,k); });
   if(p.consequence) b.appendChild(el('div','assume',esc(p.consequence)));
-  if((p.non_binding||[]).length) b.appendChild(el('div','tags',
-    '<span>'+esc(p.non_binding.join(', '))+': EVALUATED, NON-BINDING ON THIS DATA</span>'));
+  if(p.rules_note) b.appendChild(el('div','tags','<span>'+esc(p.rules_note)+'</span>'));
 };
 
 RENDER.rank_cover_options=(b,p)=>{
-  b.appendChild(el('div','sect','Options · equal cost means equal rank'));
-  const w=el('div','scrollx'), t=el('table');
-  t.innerHTML='<thead><tr><th>#</th><th>crew</th><th>cost</th><th>tie</th>'+
-    '<th>reach</th><th>action</th><th></th></tr></thead>';
-  const tb=el('tbody');
-  (p.options||[]).slice(0,8).forEach(o=>{
-    const tr=el('tr', o.rank===1?'win':(o.crew_id?'':'bad'));
-    tr.innerHTML='<td class="m">'+o.rank+'</td><td class="m">'+esc(o.crew_id||'—')+'</td>'+
-      '<td class="n cost">'+inr(o.cost_inr)+'</td>'+
-      '<td class="m"><span class="tie">'+o.tie_band+'</span></td>'+
-      '<td class="n">'+(o.reachability_minutes?o.reachability_minutes+'m':'—')+'</td>'+
-      '<td>'+esc(o.action)+'</td><td></td>';
-    if(o.crew_id){ const wb=el('button','wbtn','WHAT-IF');
-      wb.title='Make '+o.crew_id+' unavailable too, then re-ask';
-      wb.onclick=()=>pushWhatIf(o.crew_id);
-      tr.lastChild.appendChild(wb); }
-    tb.appendChild(tr);
-  });
-  t.appendChild(tb); w.appendChild(t); b.appendChild(w);
-  stagger(tb.querySelectorAll('tr'));
-  const c=tb.querySelector('.win .cost');
-  if(c && p.options[0]) countUp(c,p.options[0].cost_inr,x=>inr(Math.round(x)));
-
+  const opts=(p.options||[]).slice(0,8);
   const ex=p.excluded_candidates||[];
+  b.appendChild(el('div','sect','Cost ladder · equal cost means equal rank'));
+  const max = Math.max.apply(null, opts.map(o=>o.cost_inr||0).concat([1]));
+  const lad = el('div','ladder');
+  opts.forEach((o,i)=>{
+    const cls = o.rank===1 ? 'best' : (o.crew_id ? '' : 'cancel');
+    const r = el('div','rung '+cls);
+    r.innerHTML =
+      '<span class="rk">'+o.rank+'</span>'+
+      '<span class="who">'+esc(o.crew_id||'CANCEL')+'</span>'+
+      '<span class="track"><i class="fill"></i>'+
+        '<span class="lbl">'+esc(o.action)+
+        (o.reachability_minutes?' · '+o.reachability_minutes+'m out':'')+
+        (o.delay_hours?' · +'+o.delay_hours+'h delay':'')+'</span></span>'+
+      '<span class="amt">'+inr(o.cost_inr)+'</span>';
+    if(o.crew_id){ const wb=el('button','wbtn','WHAT-IF');
+      wb.title='Take '+o.crew_id+' out too, then re-ask';
+      wb.onclick=(e)=>{ e.stopPropagation(); pushWhatIf(o.crew_id); };
+      r.querySelector('.amt').appendChild(wb); }
+    lad.appendChild(r);
+    grow(r.querySelector('.fill'), Math.max(3, (o.cost_inr/max)*100), i*55);
+  });
+  b.appendChild(lad); stagger(lad.children, 40);
+  const amt = lad.querySelector('.best .amt');
+  if(amt && opts[0]){
+    const btn = amt.querySelector('.wbtn');
+    const txt = document.createTextNode('');
+    amt.textContent='';
+    amt.appendChild(txt); if(btn) amt.appendChild(btn);
+    countUp({set textContent(v){ txt.nodeValue=v; }}, opts[0].cost_inr,
+            x=>inr(Math.round(x)));
+  }
+
   if(ex.length){
     b.appendChild(el('div','sect','Ruled out ('+ex.length+
       ') — the first question a controller asks'));
-    const w2=el('div','scrollx'), t2=el('table','ruled'), tb2=el('tbody');
-    ex.slice(0,7).forEach(e=>{ const tr=el('tr');
-      tr.innerHTML='<td class="m">'+esc(e.crew_id)+'</td><td>'+esc(e.reason)+'</td>';
-      tb2.appendChild(tr); });
-    t2.appendChild(tb2); w2.appendChild(t2); b.appendChild(w2);
-    stagger(tb2.querySelectorAll('tr'),22);
+    const lad2 = el('div','ladder');
+    ex.slice(0,7).forEach(e=>{
+      const r=el('div','rung out');
+      r.innerHTML='<span class="rk">—</span><span class="who">'+esc(e.crew_id)+
+        '</span><span class="track"><span class="lbl">'+esc(e.reason)+
+        '</span></span><span class="amt">—</span>';
+      lad2.appendChild(r);
+    });
+    b.appendChild(lad2); stagger(lad2.children, 26);
     if(ex.length>7) b.appendChild(el('div','more','… and '+(ex.length-7)+' more'));
   }
 };
@@ -642,6 +1147,10 @@ RENDER.simulate_delay=(b,p)=>{
     'h). Re-crew: '+((pre.legs_to_shed||[]).map(x=>esc(x.split('-')[0])).join(', ')||'none')+'.'));
 };
 
+RENDER.simulate_cert_expiry=(b,p)=>{
+  if(p.summary) b.appendChild(el('div','issue',esc(p.summary)));
+};
+
 RENDER.minimal_repair=(b,p)=>{
   if(p.already_legal) return;
   b.appendChild(el('div','sect','What "yes" would cost'));
@@ -674,7 +1183,7 @@ RENDER.draft_notification=(b,p)=>{
                   : '✕ UNVERIFIED: '+esc((p.unverified_tokens||[]).join(', '))));
   const cl=p.coverage_checklist||{};
   b.appendChild(el('div','tags', Object.keys(cl).map(k=>'<span class="tag '+
-    (cl[k]?'hi':'')+'">'+(cl[k]?'✓':'—')+' '+
+    (cl[k]?'gd':'')+'">'+(cl[k]?'✓':'—')+' '+
     esc(k.replace(/_/g,' ').toUpperCase())+'</span>').join('')));
 };
 
@@ -689,7 +1198,7 @@ RENDER.latent_breaches=(b,p)=>{
 };
 
 RENDER.solve_joint_cover=(b,p)=>{
-  b.appendChild(el('div','sect','Joint plan'));
+  b.appendChild(el('div','sect','Joint plan · no crew assigned twice'));
   const t=el('table'), tb=el('tbody');
   t.innerHTML='<thead><tr><th>trip</th><th>assigned</th><th>cost</th></tr></thead>';
   Object.keys(p.assignments||{}).forEach(k=>{
@@ -700,9 +1209,8 @@ RENDER.solve_joint_cover=(b,p)=>{
   });
   t.appendChild(tb); b.appendChild(t); stagger(tb.querySelectorAll('tr'));
   b.appendChild(el('div','tags','<span class="tag hi">TOTAL '+inr(p.total_cost_inr)+
-    '</span><span class="tag '+(p.proven_optimal?'hi':'md')+'">'+
-    (p.proven_optimal?'PROVEN OPTIMAL':'LEGAL, NOT PROVEN OPTIMAL')+
-    '</span><span>NO CREW ASSIGNED TWICE</span>'));
+    '</span><span class="tag '+(p.proven_optimal?'gd':'md')+'">'+
+    (p.proven_optimal?'PROVEN OPTIMAL':'LEGAL, NOT PROVEN OPTIMAL')+'</span>'));
 };
 
 RENDER.reserve_gaps=(b,p)=>{
@@ -734,6 +1242,19 @@ RENDER.duty_hours=(b,p)=>{
   t.appendChild(tb); b.appendChild(t); stagger(tb.querySelectorAll('tr'));
 };
 
+RENDER.compute_duty_period=(b,p)=>{
+  if(p.answer){ b.appendChild(el('div','bind',
+    '<span><span class="l">EARLIEST NEXT REPORT</span><span class="v">'+
+    esc(p.answer)+'</span></span>')); return; }
+  if(p.fdp_hours==null) return;
+  b.appendChild(el('div','bind',
+    '<span><span class="l">FDP</span><span class="v">'+p.fdp_hours+' h</span></span>'+
+    '<span><span class="l">LIMIT</span><span class="v">'+p.fdp_limit_hours+' h</span></span>'+
+    '<span><span class="l">SECTORS</span><span class="v">'+p.sectors+'</span></span>'));
+  const g=el('div','gauge','<i class="fill"></i>'); b.appendChild(g);
+  grow(g.querySelector('.fill'), Math.min(100, p.fdp_hours/p.fdp_limit_hours*100));
+};
+
 RENDER.get_roster=(b,p)=>{
   (p.pairings||[]).slice(0,3).forEach(pp=>{
     b.appendChild(el('div','sect',esc(pp.pairing_id)+' · '+esc(pp.aircraft)+
@@ -754,11 +1275,13 @@ RENDER.get_roster=(b,p)=>{
 
 const SIMPLE={
   get_reserves:[p=>p.reserves,['crew','rank','base','window','reach'],
-    r=>[r.crew_id,r.rank,r.base,r.window.start+'–'+r.window.end+'Z',r.reachability_minutes+'m']],
+    r=>[r.crew_id,r.rank,r.base,r.window.start+'–'+r.window.end+'Z',
+        r.reachability_minutes+'m']],
   find_crew:[p=>p.rows,['crew','name','rank','base','ratings'],
     r=>[r.crew_id,r.name,r.rank,r.base,(r.ratings||[]).join('/')]],
   find_flights:[p=>p.rows,['flight','date','from','to','dep','block','seats'],
-    r=>[r.flight_no,r.date,r.dep_station,r.arr_station,r.dep_utc.slice(11,16)+'Z',r.block_hours,r.seats]],
+    r=>[r.flight_no,r.date,r.dep_station,r.arr_station,r.dep_utc.slice(11,16)+'Z',
+        r.block_hours,r.seats]],
   get_certifications:[p=>p.certifications,['crew','type','valid to'],
     r=>[r.crew_id,r.cert_type,r.valid_to]],
   get_risk_signals:[p=>p.signals,['crew','score','drivers'],
@@ -780,36 +1303,62 @@ Object.keys(SIMPLE).forEach(tool=>{
   };
 });
 
+/* ======================================================================
+   what-if stack
+   ====================================================================== */
+
+function syncLayers(d){
+  const w = (d && d.resolved && d.resolved.what_if) || [];
+  WHATIF = w;
+  const L=$('#layers'); L.innerHTML='';
+  if(!w.length){ L.classList.remove('on');
+    $('#mode').textContent='LIVE'; $('#mode').classList.remove('whatif'); return; }
+  L.classList.add('on');
+  L.appendChild(el('span','','WHAT-IF WORLD'));
+  w.forEach((s,i)=>{ const n=el('span','layer',
+    '<span class="ix">'+(i+1)+'</span>'+esc(s)); L.appendChild(n); enter(n,i); });
+  const r=el('button','push','RESET TO LIVE'); r.onclick=resetWhatIf;
+  L.appendChild(r);
+  $('#mode').textContent='WHAT-IF · '+w.length+' LAYER'+(w.length>1?'S':'');
+  $('#mode').classList.add('whatif');
+}
+
 async function pushWhatIf(crewId){
   try{
     await fetch('/api/whatif',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({session:SESSION, crew_id:crewId})});
   }catch(e){ return; }
-  WHATIF.push(crewId);
-  $('#mode').textContent='WHAT-IF · '+WHATIF.join(' + ')+' OUT';
-  $('#mode').classList.add('whatif');
   const last=HISTORY[HISTORY.length-1];
-  if(last) ask(last);
+  if(last) ask(last); else syncLayers({resolved:{what_if:WHATIF.concat([crewId])}});
 }
 async function resetWhatIf(){
   try{ await fetch('/api/reset',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({session:SESSION})}); }catch(e){}
-  WHATIF=[];
-  $('#mode').textContent='LIVE'; $('#mode').classList.remove('whatif');
+  syncLayers(null);
   const n=el('div','turn');
   n.appendChild(el('div','you','↺ what-if cleared — back to the live snapshot'));
   $('#feedInner').appendChild(n); enter(n);
   $('#feed').scrollTop=$('#feed').scrollHeight;
 }
 
+/* ======================================================================
+   evidence ledger
+   ====================================================================== */
+
 function renderEvidence(d){
   const box=$('#eviBody'), facts=d.evidence||[];
-  if(!facts.length){ box.className='ev-empty';
+  LAST_FACTS=facts;
+  const stat=$('#evStat');
+  if(!facts.length){ box.className='ev-empty'; stat.innerHTML='';
     box.textContent='No computed facts for this answer.'; return; }
+  const withSrc = facts.filter(f=>f.source||f.derivation).length;
+  stat.innerHTML='<span>'+facts.length+' FACTS</span><span>'+withSrc+
+    ' WITH PROVENANCE</span><span>'+esc((d.plan&&d.plan.tool)||'')+'</span>';
   box.className=''; box.innerHTML='';
   const t=el('table'), tb=el('tbody');
   t.innerHTML='<thead><tr><th>fact</th><th>value</th></tr></thead>';
   facts.forEach(f=>{ const tr=el('tr');
+    tr.dataset.fact=f.key;
     tr.innerHTML='<td class="m">'+esc(f.key)+'</td><td class="n">'+esc(f.value)+' '+
       esc(f.unit||'')+((f.derivation||f.source)?'<div class="ev-src">'+
       esc(f.derivation||f.source)+'</div>':'')+'</td>';
@@ -820,6 +1369,153 @@ function evNum(d,prefix){
   const f=(d.evidence||[]).find(x=>x.key.indexOf(prefix)===0);
   return f?Number(f.value):null;
 }
+
+/* ======================================================================
+   command palette
+   ====================================================================== */
+
+const COMMANDS = [
+  {kind:'view', label:'Toggle the evidence ledger', run:()=>$('#cols').classList.toggle('ev')},
+  {kind:'view', label:'Open the scoreboard and conformance report', run:openProof},
+  {kind:'view', label:'Switch light / dark', run:()=>$('#themeBtn').click()},
+  {kind:'world',label:'Reset the what-if stack to the live snapshot', run:resetWhatIf},
+];
+let PAL_SEL = 0, PAL_ITEMS = [];
+
+function palItems(term){
+  const t=term.trim().toLowerCase();
+  const ex = EXAMPLES.map(x=>({kind:x.tier.toLowerCase(), label:x.q,
+                               run:()=>ask(x.q)}));
+  const all = COMMANDS.concat(ex);
+  const hits = t ? all.filter(x=>x.label.toLowerCase().indexOf(t)>=0) : all;
+  if(t && !hits.length) return [{kind:'ask', label:'Ask: “'+term+'”',
+                                 run:()=>ask(term)}];
+  if(t) hits.unshift({kind:'ask', label:'Ask: “'+term+'”', run:()=>ask(term)});
+  return hits.slice(0,40);
+}
+function drawPal(term){
+  PAL_ITEMS = palItems(term); PAL_SEL = 0;
+  const L=$('#palList'); L.innerHTML='';
+  PAL_ITEMS.forEach((it,i)=>{
+    const b=el('button','pi'+(i===0?' sel':''),
+      '<span class="kind">'+esc(it.kind)+'</span><span>'+esc(it.label)+'</span>');
+    b.onmouseenter=()=>{ L.querySelectorAll('.pi').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel'); PAL_SEL=i; };
+    b.onclick=()=>{ closePal(); it.run(); };
+    L.appendChild(b);
+  });
+}
+function openPal(){
+  $('#palVeil').classList.add('on');
+  $('#palIn').value=''; drawPal('');
+  $('#palIn').focus();
+}
+function closePal(){ $('#palVeil').classList.remove('on'); }
+$('#palVeil').addEventListener('click', e=>{ if(e.target===$('#palVeil')) closePal(); });
+$('#palIn').addEventListener('input', e=>drawPal(e.target.value));
+$('#palIn').addEventListener('keydown', e=>{
+  const rows=$('#palList').querySelectorAll('.pi');
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    PAL_SEL=Math.max(0,Math.min(rows.length-1, PAL_SEL+(e.key==='ArrowDown'?1:-1)));
+    rows.forEach((r,i)=>r.classList.toggle('sel', i===PAL_SEL));
+    if(rows[PAL_SEL]) rows[PAL_SEL].scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'){
+    const it=PAL_ITEMS[PAL_SEL]; if(it){ closePal(); it.run(); }
+  }
+});
+
+/* ======================================================================
+   the receipts
+   ====================================================================== */
+
+let PROOF_LOADED=false;
+function openProof(){
+  $('#proofVeil').classList.add('on');
+  if(PROOF_LOADED) return;
+  PROOF_LOADED=true;
+  Promise.all([
+    fetch('/api/eval').then(r=>r.json()).catch(()=>null),
+    fetch('/api/conformance').then(r=>r.json()).catch(()=>null),
+    fetch('/api/routing').then(r=>r.ok?r.json():null).catch(()=>null),
+  ]).then(([ev,cf,rt])=>drawProof(ev,cf,rt));
+}
+function closeProof(){ $('#proofVeil').classList.remove('on'); }
+$('#proofClose').onclick=closeProof;
+$('#proofVeil').addEventListener('click', e=>{ if(e.target===$('#proofVeil')) closeProof(); });
+
+const TIER_NAME={1:'Tier 1',2:'Tier 2',3:'Tier 3',4:'Scenarios',5:'Held-out'};
+
+function drawProof(ev,cf,rt){
+  const B=$('#proofBody'); B.innerHTML='';
+
+  if(ev){
+    B.appendChild(el('div','sect','Answer-key regression · exact arithmetic'));
+    Object.keys(ev.by_tier).sort().forEach((k,i)=>{
+      const t=ev.by_tier[k], n=t.CORRECT+t.RUBRIC+t.WRONG+t.ABSTAINED || 1;
+      const row=el('div','tierrow',
+        '<span class="nm">'+esc(TIER_NAME[k]||('Tier '+k))+'</span>'+
+        '<span class="bar"><i class="ok"></i><i class="rb"></i><i class="wr"></i></span>'+
+        '<span class="ct">'+t.CORRECT+' exact'+(t.RUBRIC?' · '+t.RUBRIC+' rubric':'')+
+        (t.WRONG?' · '+t.WRONG+' WRONG':'')+'</span>');
+      B.appendChild(row);
+      const bars=row.querySelectorAll('.bar i');
+      grow(bars[0], t.CORRECT/n*100, i*70);
+      grow(bars[1], t.RUBRIC/n*100,  i*70+80);
+      grow(bars[2], t.WRONG/n*100,   i*70+160);
+    });
+    const t=ev.totals;
+    B.appendChild(el('div','tags',
+      '<span class="tag gd">'+t.CORRECT+' EXACT</span>'+
+      '<span class="tag pv">'+t.RUBRIC+' OPEN-ENDED, GRADED BY HAND</span>'+
+      '<span class="tag '+(t.WRONG?'md':'gd')+'">'+t.WRONG+' WRONG</span>'+
+      '<span class="tag '+(t.ABSTAINED?'md':'')+'">'+t.ABSTAINED+' ABSTAINED</span>'));
+  }
+
+  if(rt){
+    B.appendChild(el('div','sect','Language routing · does a typed sentence arrive'));
+    const pct=Math.round(100*rt.correct_tool/rt.total);
+    const row=el('div','tierrow',
+      '<span class="nm">shipped set</span>'+
+      '<span class="bar"><i class="ok"></i></span>'+
+      '<span class="ct">'+rt.correct_tool+'/'+rt.total+' · '+pct+'%</span>');
+    B.appendChild(row);
+    grow(row.querySelector('.ok'), pct, 60);
+    B.appendChild(el('div','tags','<span>'+esc(rt.model||'deterministic index')+
+      '</span><span class="tag '+(rt.refused?'md':'')+'">'+rt.refused+
+      ' REFUSED RATHER THAN GUESSED</span>'));
+  }
+
+  if(cf){
+    B.appendChild(el('div','sect','Rulebook vs data · where the prose and the '+
+                                  'dataset disagree'));
+    B.appendChild(el('div','more',(cf.findings||[]).length+' findings. Each one '+
+      'is a place the written rule and the shipped data cannot both be '+
+      'satisfied. We follow one of them, say which, and record what that '+
+      'costs.'));
+    (cf.findings||[]).forEach((f,i)=>{
+      const box=el('div','finding');
+      const head=el('button','','<span class="cls '+esc(f['class'])+'">CLASS '+
+        esc(f['class'])+'</span><span>'+esc(f.id)+' · '+esc(f.rule)+'</span>');
+      const det=el('div','det',
+        '<div><b>Prose says:</b> '+esc(f.prose_says)+'</div>'+
+        '<div><b>Data requires:</b> '+esc(f.data_requires)+'</div>'+
+        '<div><b>Why:</b> '+esc(f.why)+'</div>'+
+        '<div><b>We follow:</b> '+esc(f.we_follow)+'</div>'+
+        (f.risk_accepted?'<div><b>Risk accepted:</b> '+esc(f.risk_accepted)+'</div>':''));
+      head.onclick=()=>box.classList.toggle('open');
+      box.appendChild(head); box.appendChild(det);
+      B.appendChild(box); enter(box,i);
+    });
+  }
+
+  if(!ev && !cf) B.textContent='The scoreboard endpoints did not respond.';
+}
+
+/* ======================================================================
+   small helpers
+   ====================================================================== */
+
 function hm(h){ const H=Math.floor(h), M=Math.round((h-H)*60);
   return H+'h'+(M<10?'0':'')+M+'m'; }
 function short(role){ return String(role).replace('First Officer','FO')
@@ -834,6 +1530,5 @@ function runs(hrs){
   });
   return out.join(', ');
 }
-$('#q').focus();
 </script>
 </body></html>
