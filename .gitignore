@@ -14,3 +14,8 @@ extracted/
 bash.exe.stackdump
 ruvector.db
 .claude/
+.ruff_cache/
+
+# supplied material, not ours to redistribute: the problem statement PDF and
+# the synthetic dataset both ship with the brief, not with this repo.
+*.pdf
