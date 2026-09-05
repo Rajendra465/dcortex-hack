@@ -641,7 +641,14 @@ function bootSet(id,text,bad){
   if(bad){ const s=n.querySelector('.st'); s.className='st no'; s.textContent='CHECK'; }
 }
 function dismissBoot(){
-  const b=$('#boot'); if(b.classList.contains('gone')) return;
+  // The null check is load-bearing, not defensive padding. This runs from the
+  // 2.35s timer, from the first keypress, from a click on the overlay AND
+  // from the top of ask() -- and whichever fires first removes the node.
+  // Without the guard every later call threw on `null.classList`, which
+  // aborted ask() before it sent anything: the Ask button silently stopped
+  // working the moment the cold open finished.
+  const b = $('#boot');
+  if(!b || b.classList.contains('gone')) return;
   b.classList.add('gone');
   $('#app').classList.add('up');
   if(REDUCED){ b.remove(); $('#q').focus(); return; }
@@ -792,14 +799,34 @@ async function ask(q){
     d=await r.json();
   }catch(err){ d={error:String(err)}; }
 
+  // The button is re-enabled in `finally`, always. A renderer that throws on
+  // one unusual payload should cost you that one card, not the rest of the
+  // session -- and a desk whose Ask button has gone dead gives the operator
+  // no clue why, which is the worst possible way for a demo to fail.
   card.innerHTML='';
-  renderCard(card,d);
-  renderEvidence(d);
-  syncLayers(d);
-  if(d && d.elapsed_ms!=null) $('#hsMs').textContent=Math.round(d.elapsed_ms)+' ms';
-  $('#send').disabled=false;
-  $('#feed').scrollTop=$('#feed').scrollHeight;
-  $('#q').focus();
+  try{
+    renderCard(card,d);
+    renderEvidence(d);
+    syncLayers(d);
+    if(d && d.elapsed_ms!=null) $('#hsMs').textContent=Math.round(d.elapsed_ms)+' ms';
+  }catch(err){
+    card.className='card refuse';
+    card.innerHTML='';
+    card.appendChild(el('div','body','<div class="refuse-b">'+
+      '<div class="h">The answer arrived; drawing it did not</div>'+
+      '<div class="row">'+esc(String(err))+'</div>'+
+      '<div class="row">The reply is intact — open RAW JSON below.</div></div>'));
+    const pre=el('pre'); pre.style.cssText='font-family:var(--m);font-size:10.5px;'+
+      'background:var(--panel2);padding:12px;border-radius:3px;overflow:auto;'+
+      'margin:0 21px 16px;max-height:320px';
+    pre.textContent=JSON.stringify(d,null,2);
+    card.appendChild(pre);
+    if(window.console) console.error('[crewops] render failed', err, d);
+  }finally{
+    $('#send').disabled=false;
+    $('#feed').scrollTop=$('#feed').scrollHeight;
+    $('#q').focus();
+  }
 }
 
 /* ======================================================================
@@ -939,8 +966,10 @@ function renderCard(card,d){
       '<i></i>'+(warn
         ? tr.loose+' figure'+(tr.loose>1?'s':'')+' not in the ledger · '+
           tr.traced+' traced'
-        : 'all '+tr.traced+' figure'+(tr.traced>1?'s':'')+
-          ' trace to the evidence ledger — click one')));
+        : (tr.traced>1
+            ? 'all '+tr.traced+' figures trace to the evidence ledger — '+
+              'click one'
+            : 'this figure traces to the evidence ledger — click it'))));
   }
 
   const steps=(d.plan&&d.plan.steps)||[];
