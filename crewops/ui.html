@@ -2503,6 +2503,39 @@ input, select { font: inherit; color: inherit; }
 .flow-opt.best .who{font-weight:600}
 .flow-save{margin-top:8px;padding:8px 11px;border-radius:6px;font-size:.74rem;
   background:rgba(45,140,95,.10);border:1px solid var(--brand-green);color:var(--ink-primary)}
+
+/* data behind each step of the decision network */
+.dfacts{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.dfact{font-family:var(--font-mono);font-size:.63rem;padding:2px 7px;border-radius:3px;
+  background:rgba(127,127,127,.10);color:var(--ink-secondary)}
+.dfact b{color:var(--ink-primary);font-weight:600;margin-right:4px}
+
+/* ---- consequences of a decision ---------------------------------------- */
+.conseq{margin-top:12px;border:1px solid var(--brand-green);border-radius:8px;overflow:hidden}
+.conseq-head{padding:8px 13px;background:rgba(45,140,95,.12);font-size:.72rem;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--brand-green-strong)}
+.conseq-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:9px 13px;
+  border-top:1px solid var(--hairline);font-size:.76rem;align-items:baseline}
+.conseq-row:first-of-type{border-top:none}
+.conseq-row .lbl{color:var(--ink-secondary)}
+.conseq-row .val{font-family:var(--font-mono);font-weight:600;white-space:nowrap}
+.conseq-row .val.up{color:var(--brand-orange)}
+.conseq-row .val.ok{color:var(--brand-green-strong)}
+.conseq-note{padding:9px 13px;border-top:1px solid var(--hairline);font-size:.71rem;
+  color:var(--ink-secondary);line-height:1.5}
+.btn-authorise{margin-top:9px;padding:6px 13px;border-radius:6px;cursor:pointer;font-family:inherit;
+  font-size:.73rem;font-weight:600;border:1px solid var(--brand-green);
+  background:var(--brand-green-strong);color:#fff}
+.btn-authorise:hover{filter:brightness(1.08)}
+
+/* ---- live feed ---------------------------------------------------------- */
+.live-bar{display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid var(--hairline);
+  font-size:.68rem;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.08em}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--brand-orange);animation:blink 1.6s infinite}
+.live-items{display:flex;flex-wrap:wrap;gap:5px;margin-left:auto;text-transform:none;letter-spacing:0}
+.live-item{padding:3px 9px;border-radius:11px;font-size:.68rem;cursor:pointer;
+  border:1px solid var(--brand-orange);background:rgba(214,138,48,.10);color:var(--ink-primary)}
+.live-item:hover{filter:brightness(1.1)}
 </style>
 </head>
 <body>
@@ -3021,6 +3054,8 @@ input, select { font: inherit; color: inherit; }
                     <!-- Somewhere to start. Populated from /api/examples, which
                          has been returning these all along with nothing calling it. -->
                     <!-- Six real disruptions, straight from scenarios.json. -->
+                    <div class="live-bar"><span class="live-dot"></span>Live
+                        <span class="live-items" id="liveItems"></span></div>
                     <div class="flow-bar" id="scenarioBar"></div>
                     <div class="starter-wrap" id="starterQuestions"></div>
                     <div class="chat-input-bar">
@@ -3509,6 +3544,7 @@ ACK REQD VIA ACARS CPDLC OR FREQ 131.850 MHZ</div>
         // Neither is awaited: an empty desk must never wait on its own furniture.
         loadStarterQuestions();
         loadScenarioBar();
+        startLiveFeed();
         await loadInitialData();
         // Initial binding to recommended pilot C-3310
         bindCandidateToRightPane('C-3310');
@@ -3706,6 +3742,195 @@ ACK REQD VIA ACARS CPDLC OR FREQ 131.850 MHZ</div>
 
 
 
+
+    // ---- one flow renderer, shared -----------------------------------------
+    // Scenario buttons and live alerts answer the same four questions, so they
+    // render through the same function rather than two that drift apart.
+    function renderFlowFromResolve(card, headline, d) {
+        const imp = d.impact || {};
+        const sols = d.solutions || [];
+        const byDay = imp.uncovered_by_day || {};
+        let legs = '';
+        Object.keys(byDay).forEach(function (day) {
+            legs += '<div class="flow-legs">' + byDay[day].map(function (f) {
+                return '<span class="flow-leg">' +
+                    escapeHtml(String(f).split('-2026')[0]) + '</span>';
+            }).join('') + '<span class="dim" style="font-size:.68rem">' +
+            escapeHtml(day) + '</span></div>';
+        });
+
+        const legal = sols.filter(function (o) { return o.legal; });
+        const best = legal[0], next = legal[1];
+        const pid = imp.pairing_broken || (d.event && d.event.pairing_id) || '';
+
+        const optHtml = legal.slice(0, 4).map(function (o, i) {
+            return '<div class="flow-opt' + (i === 0 ? ' best' : '') + '">' +
+                '<span class="rk">#' + (o.rank || i + 1) + '</span>' +
+                '<span class="who">' + escapeHtml(o.crew_id || '') + ' <span class="dim">' +
+                escapeHtml(String(o.action || '').replace(/^Assign [A-Za-z ]+ /, '')) +
+                '</span></span><span class="cost">' +
+                (o.cost_inr ? 'INR ' + Number(o.cost_inr).toLocaleString('en-IN') : '') +
+                '</span></div>';
+        }).join('');
+
+        let saving = '';
+        if (best && next && next.cost_inr > best.cost_inr) {
+            saving = '<div class="flow-save">Taking ' + escapeHtml(best.crew_id) +
+                ' over the next legal option saves <b>INR ' +
+                Number(next.cost_inr - best.cost_inr).toLocaleString('en-IN') +
+                '</b>. Cancelling instead is INR 2,50,000 per leg.</div>';
+        }
+        // The decision itself. Authorising is what makes this a simulation
+        // rather than a report.
+        let act = '';
+        if (best && pid) {
+            act = '<button class="btn-authorise" type="button" onclick="commitDecision(' +
+                  JSON.stringify(best.crew_id) + ',' + JSON.stringify(pid) +
+                  ',\'Captain\')">Authorise ' + escapeHtml(best.crew_id) +
+                  ' &rarr; see what it costs</button>';
+        }
+
+        card.querySelector('.flow').innerHTML =
+            flowStep(1, 'What happened', escapeHtml(headline), 'done') +
+            flowStep(2, 'What breaks',
+                     escapeHtml(d.problem || 'No downstream impact.') + legs,
+                     imp.uncrewed_flights ? 'bad' : 'done') +
+            flowStep(3, 'Who can legally take it',
+                     legal.length
+                       ? '<span class="dim">' + legal.length + ' legal of ' +
+                         sols.length + ' considered</span>' + optHtml
+                       : '<span class="dim">No legal cover. That is the answer, not a failure.</span>',
+                     legal.length ? 'done' : 'bad') +
+            flowStep(4, 'What it costs',
+                     best ? escapeHtml(best.action || '') + saving + act
+                          : '<span class="dim">Nothing to price until there is a legal option.</span>',
+                     best ? 'done' : 'bad');
+        enter(card);
+    }
+
+    // ---- authorise, and live with the result ------------------------------
+    // This used to raise a toast and change nothing. Authorising is the only
+    // action on this desk that alters the world, so it goes through the same
+    // overlay as a what-if: visible, reversible, and every later answer is
+    // computed in the world it created.
+    async function commitDecision(crewId, pairingId, role) {
+        const feed = document.getElementById('chatFeed');
+        const card = document.createElement('div');
+        card.className = 'advisor-card-rich';
+        card.innerHTML = '<div class="conseq"><div class="conseq-head">Authorising\u2026</div></div>';
+        if (feed) { feed.appendChild(card); enter(card); feed.scrollTop = feed.scrollHeight; }
+        try {
+            const d = await (await fetch('/api/commit', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({crew_id: crewId, pairing_id: pairingId,
+                                      role: role || 'Captain', session: STATE.session})
+            })).json();
+            if (d.error) throw new Error(d.error);
+            const c = d.consequences || {};
+            const gap = c.standby_gap_hours || {};
+            const thin = c.single_cover_trips || {};
+            const gapDelta = (gap.after || 0) - (gap.before || 0);
+
+            let rows = conseqRow('Trip covered',
+                c.covered ? 'yes' : 'still uncrewed', c.covered ? 'ok' : 'up');
+            if (c.own_week) {
+                rows += conseqRow(escapeHtml(c.own_week.crew_id) + ' now rostered',
+                    '+' + c.own_week.duty_days_added + ' duty day(s)');
+            }
+            if (c.left_standby) rows += conseqRow('Left the standby pool', 'yes', 'up');
+            if (gap.before !== undefined) {
+                rows += conseqRow('Hours with no standby captain',
+                    gap.before + ' \u2192 ' + gap.after, gapDelta > 0 ? 'up' : 'ok');
+            }
+            if (thin.before !== undefined) {
+                rows += conseqRow('Trips down to one legal captain',
+                    thin.before + ' \u2192 ' + thin.after, thin.delta > 0 ? 'up' : 'ok');
+            }
+            const note = gapDelta > 0
+                ? 'Spending a standby captain fixes today and thins tomorrow: ' + gapDelta +
+                  ' more hours of the day now have no reserve captain on call. Ask the same ' +
+                  'question again and it is answered in this world; Reset steps back out of it.'
+                : 'Ask the same question again and it is answered in this world. ' +
+                  'Reset steps back out of it.';
+
+            card.innerHTML = '<div class="conseq">' +
+                '<div class="conseq-head">Authorised \u00b7 ' + escapeHtml(crewId) +
+                ' on ' + escapeHtml(pairingId) + '</div>' + rows +
+                '<div class="conseq-note">' + note + '</div></div>';
+            enter(card);
+            if (typeof loadInitialData === 'function') loadInitialData();
+        } catch (err) {
+            card.innerHTML = '<div class="conseq" style="border-color:var(--status-critical)">' +
+                '<div class="conseq-head" style="color:var(--status-critical);' +
+                'background:rgba(224,82,82,.10)">Not authorised</div>' +
+                '<div class="conseq-note">' + escapeHtml(err.message) +
+                '. Nothing was changed.</div></div>';
+        } finally {
+            if (feed) feed.scrollTop = feed.scrollHeight;
+        }
+    }
+
+    function conseqRow(label, value, cls) {
+        return '<div class="conseq-row"><span class="lbl">' + label + '</span>' +
+               '<span class="val ' + (cls || '') + '">' + value + '</span></div>';
+    }
+
+    // ---- live feed --------------------------------------------------------
+    // /api/stream has been emitting real disruptions since it was written and
+    // nothing consumed it. Each alert is clickable and runs the same
+    // consequence chain as a scenario button, so an incoming event is the start
+    // of a decision rather than a notification you dismiss.
+    let LIVE_ES = null;
+
+    function startLiveFeed() {
+        const host = document.getElementById('liveItems');
+        if (!host || LIVE_ES) return;
+        try {
+            LIVE_ES = new EventSource('/api/stream');
+            LIVE_ES.onmessage = function (m) {
+                let d;
+                try { d = JSON.parse(m.data); } catch (e) { return; }
+                if (!d || !d.dynamic_event) return;
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'live-item';
+                b.textContent = d.title || d.dynamic_event.type;
+                b.onclick = function () { runLiveEvent(d.dynamic_event, d.title); };
+                host.insertBefore(b, host.firstChild);
+                while (host.children.length > 3) host.removeChild(host.lastChild);
+                enter(b);
+            };
+            LIVE_ES.onerror = function () { /* the desk works without it */ };
+        } catch (e) { /* no stream, no problem */ }
+    }
+
+    async function runLiveEvent(ev, title) {
+        switchOCCView('console');
+        const feed = document.getElementById('chatFeed');
+        const u = document.createElement('div');
+        u.className = 'chat-bubble-user';
+        u.textContent = title || ('Incoming: ' + ev.type);
+        feed.appendChild(u); enter(u);
+        const card = document.createElement('div');
+        card.className = 'advisor-card-rich';
+        card.innerHTML = '<div class="flow">' +
+            flowStep(1, 'What happened', escapeHtml(title || ev.type), 'done') +
+            flowStep(2, 'What breaks', '<span class="dim">working it out\u2026</span>', '') +
+            '</div>';
+        feed.appendChild(card); enter(card);
+        try {
+            const d = await (await fetch('/api/resolve_event', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({dynamic_event: ev})
+            })).json();
+            renderFlowFromResolve(card, title || ev.type, d);
+        } catch (err) {
+            card.querySelector('.flow').innerHTML +=
+                flowStep(2, 'What breaks', escapeHtml(err.message), 'bad');
+        }
+        feed.scrollTop = feed.scrollHeight;
+    }
+
     // ---- scenario flow ----------------------------------------------------
     // The desk answered "who should cover this" and showed none of the middle.
     // These are the four questions a controller actually asks, in order.
@@ -3784,58 +4009,7 @@ ACK REQD VIA ACARS CPDLC OR FREQ 131.850 MHZ</div>
                 body: JSON.stringify({dynamic_event: scenarioEvent(scn)})
             });
             const d = await res.json();
-            const imp = d.impact || {};
-            const sols = d.solutions || [];
-
-            // The legs, named. "3 flights uncrewed" is not something a
-            // controller can act on; DX412 is.
-            const byDay = imp.uncovered_by_day || {};
-            let legs = '';
-            Object.keys(byDay).forEach(function (day) {
-                legs += '<div class="flow-legs">' + byDay[day].map(function (f) {
-                    return '<span class="flow-leg">' +
-                        escapeHtml(String(f).split('-2026')[0]) + '</span>';
-                }).join('') + '<span class="dim" style="font-size:.68rem">' +
-                escapeHtml(day) + '</span></div>';
-            });
-
-            const legal = sols.filter(function (o) { return o.legal; });
-            const best = legal[0], next = legal[1];
-            const optHtml = legal.slice(0, 4).map(function (o, i) {
-                return '<div class="flow-opt' + (i === 0 ? ' best' : '') + '">' +
-                    '<span class="rk">#' + (o.rank || i + 1) + '</span>' +
-                    '<span class="who">' + escapeHtml(o.crew_id || '') +
-                    ' <span class="dim">' + escapeHtml(
-                        String(o.action || '').replace(/^Assign [A-Za-z ]+ /, '')) +
-                    '</span></span>' +
-                    '<span class="cost">' + (o.cost_inr
-                        ? 'INR ' + Number(o.cost_inr).toLocaleString('en-IN') : '') +
-                    '</span></div>';
-            }).join('');
-
-            let saving = '';
-            if (best && next && next.cost_inr > best.cost_inr) {
-                saving = '<div class="flow-save">Taking ' + escapeHtml(best.crew_id) +
-                    ' over the next legal option saves <b>INR ' +
-                    Number(next.cost_inr - best.cost_inr).toLocaleString('en-IN') +
-                    '</b>. Cancelling instead is INR 2,50,000 per leg.</div>';
-            }
-
-            card.querySelector('.flow').innerHTML =
-                flowStep(1, 'What happened', escapeHtml(scn.narrative || ''), 'done') +
-                flowStep(2, 'What breaks',
-                         escapeHtml(d.problem || 'No downstream impact.') + legs,
-                         imp.uncrewed_flights ? 'bad' : 'done') +
-                flowStep(3, 'Who can legally take it',
-                         legal.length
-                           ? '<span class="dim">' + legal.length + ' legal of ' +
-                             sols.length + ' considered</span>' + optHtml
-                           : '<span class="dim">No legal cover. That is the answer, not a failure.</span>',
-                         legal.length ? 'done' : 'bad') +
-                flowStep(4, 'What it costs',
-                         best ? escapeHtml(best.action || '') + saving
-                              : '<span class="dim">Nothing to price until there is a legal option.</span>',
-                         best ? 'done' : 'bad');
+            renderFlowFromResolve(card, scn.narrative || scn.title || sid, d);
             enter(card);
         } catch (err) {
             card.querySelector('.flow').innerHTML +=
@@ -3924,6 +4098,28 @@ ACK REQD VIA ACARS CPDLC OR FREQ 131.850 MHZ</div>
     // lost; the kernel derives; the narrator speaks last and is checked. The
     // rejected options are the point -- "why not someone else" is the first
     // thing a controller asks.
+    // What each step is called on screen, in the controller's words. The
+    // internal names -- gate, derive, kernel, narrate -- describe how the code
+    // is built, which is nobody else's problem.
+    const DNET_NAME = {
+      'scope':          'Is this our job?',
+      'horizon':        'Is it in the week we hold?',
+      'entity exists':  'Do we know this crew member?',
+      'entities':       'What we understood',
+      'route':          'What kind of question',
+      'planners':       'How we read it',
+      'tool horizon':   'Dates re-checked',
+      'plan valid':     'Checked before running',
+      'kernel':         'Worked out against the rulebook',
+      'candidates':     'Who we considered',
+      'narrate':        'Written up',
+      'number guard':   'Every number checked'
+    };
+    const DNET_KIND = {
+      gate: 'can stop here', derive: 'works it out',
+      choose: 'weighs options', speak: 'writes it up'
+    };
+
     const DNET_BLURB = {
       'scope': 'Is this about crew operations at all, and do we hold the kind of data it asks for?',
       'horizon': 'Do the dates fall inside the week this dataset covers?',
@@ -3952,13 +4148,27 @@ ACK REQD VIA ACARS CPDLC OR FREQ 131.850 MHZ</div>
         }).join('<br>');
         var agree = (s.meta && s.meta.agreement)
           ? '<div class="dwhy">' + escapeHtml(s.meta.agreement) + '</div>' : '';
+        // A step that claims something should show the figure it claims it
+        // from. The trace already carried these and nothing rendered them.
+        var facts = '';
+        if (s.meta) {
+            var pairs = Object.keys(s.meta).filter(function (k) {
+                return k !== 'agreement' && s.meta[k] !== null && s.meta[k] !== '';
+            }).map(function (k) {
+                var v = s.meta[k];
+                if (Array.isArray(v)) v = v.join(', ');
+                return '<span class="dfact"><b>' + escapeHtml(k.replace(/_/g, ' ')) +
+                       '</b> ' + escapeHtml(String(v)) + '</span>';
+            });
+            if (pairs.length) facts = '<div class="dfacts">' + pairs.join('') + '</div>';
+        }
         return '<div class="dstage k-' + s.kind + (blocked ? ' blocked' : '') + '">' +
           '<span class="dnode"></span>' +
-          '<span><span class="dname">' + escapeHtml(s.name) + '</span>' +
-          '<span class="dkind">' + s.kind + '</span></span>' +
+          '<span><span class="dname">' + escapeHtml(DNET_NAME[s.name] || s.name) + '</span>' +
+          '<span class="dkind">' + escapeHtml(DNET_KIND[s.kind] || s.kind) + '</span></span>' +
           '<span><span class="ddetail">' + escapeHtml(s.detail || DNET_BLURB[s.name] || '') + '</span>' +
           (opts ? '<div class="dopts">' + opts + '</div>' : '') +
-          (why ? '<div class="dwhy">' + why + '</div>' : '') + agree + '</span>' +
+          (why ? '<div class="dwhy">' + why + '</div>' : '') + facts + agree + '</span>' +
           '<span class="dms">' + s.ms + ' ms</span></div>';
       }).join('');
       var blockedAt = null;
