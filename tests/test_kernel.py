@@ -453,3 +453,44 @@ def test_every_tool_is_reachable_and_documented():
         assert t.kind in ("retrieval", "simulation", "optimisation")
         for r in t.required:
             assert r in t.params, f"{name}: required param {r} not declared"
+
+
+# ---------------------------------------------------------------- REST-04 cascade
+# A delay grows the duty AND pushes release later. FDP-01 only sees the first
+# half of that. On P-2291 the overnight rest is 12.50h against a 12h floor, so
+# 0.50h of delay is the entire margin -- and the duty is still 2.5h inside its
+# own FDP limit when the rest breaks. Before this was fixed the advisor said
+# "still legal" about a morning six crew could not legally report for.
+
+def test_delay_reports_rest_cascade_not_just_fdp(snap):
+    """0.51h on P-2291 day 1 is legal on FDP and illegal on rest."""
+    imp = analyse_delay(snap, delay_hours=0.51, pairing_id="P-2291",
+                        on_date="2026-09-15")
+    d = imp.data
+    assert d["breach"] is False, "FDP-01 is genuinely satisfied here"
+    assert d["fdp_after_delay"] < d["fdp_limit"], "duty sits inside its own limit"
+    assert d["rest_breach"] is True, "but RULE-REST-04 is breached downstream"
+    assert {b["crew_id"] for b in d["rest_breaches"]} == {
+        "C-1042", "C-1694", "C-3005", "C-4395", "C-4273", "C-1873"}
+    assert d["rest_breaches"][0]["rest_hours"] == 11.99
+    assert "still legal" not in imp.summary, "the old wording was the bug"
+    assert "RULE-REST-04" in imp.summary
+
+
+def test_delay_inside_the_rest_margin_stays_clean(snap):
+    """0.50h is exactly the margin -- 12.00h rest is legal, so no false alarm."""
+    imp = analyse_delay(snap, delay_hours=0.50, pairing_id="P-2291",
+                        on_date="2026-09-15")
+    assert imp.data["rest_breach"] is False
+    assert imp.data["rest_breaches"] == []
+    assert "still legal" in imp.summary
+
+
+def test_s4_delay_unchanged_by_the_rest_check(snap):
+    """The shipped S4 key is an FDP breach with 60.75h of rest slack."""
+    imp = analyse_delay(snap, delay_hours=1.5, aircraft="VT-DXA",
+                        on_date="2026-09-16")
+    d = imp.data
+    assert (d["fdp_after_delay"], d["fdp_limit"], d["breach"]) == (12.75, 12.0, True)
+    assert d["legs_to_shed"] == ["DX404-2026-09-16"]
+    assert d["rest_breach"] is False
