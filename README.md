@@ -34,10 +34,22 @@ python -m crewops conformance   # rulebook vs data disagreements
 python -m crewops serve         # the web desk on http://127.0.0.1:8787
 ```
 
-The web desk is the best way to see it: a live board (already-illegal roster
-entries, thinnest cover, standby gaps), click-to-run examples across all three
-tiers, an evidence drawer, and a what-if mode that makes a second crew member
-unavailable and re-asks against the changed world.
+The web desk is the best way to see it. One thing there is worth arriving for:
+
+**every figure in an answer is underlined and clickable.** Click one and the
+evidence drawer scrolls to the exact fact it came from. A figure that *cannot*
+be traced to the ledger is underlined in amber instead of cyan — so the claim
+"no number passes through a language model" is not a sentence in a README, it
+is a property you can check by looking at the screen. Across the ten worked
+answers, 28 of 28 figures trace; `tests/test_routing.py` asserts the same thing
+server-side for every shipped prompt, using the same containment guard.
+
+The rest: a live morning board (already-illegal roster entries, thinnest cover,
+standby gaps drawn as a 24-hour bar), all seven rules shown lighting up per
+answer rather than only the one that failed, cover options as a cost ladder
+with the ruled-out crew on the same axis, `⌘K` for a command palette, and a
+what-if stack — take a second crew member out and every later answer is against
+that world, with the stack visible in the header until you reset it.
 
 Optional — a language model widens what phrasings are understood. Either
 provider works; copy `.env.example` to `.env` and fill one in:
@@ -120,12 +132,17 @@ and falls back to the template rather than hanging the desk.
 
 ### What happens if you delete the language model
 
-You keep every correct answer you still get, and lose the ability to phrase
-questions freely. Run any command with `--no-model` to see it: the kernel still
-answers 42/42 against the reference keys, but the index alone routes only about
-half the shipped prompts from their natural-language form. The model buys the
-*frame*, never the *facts* — which is why removing it degrades coverage and
-never correctness.
+You keep every correct answer, and you keep the routing too. Run any command
+with `--no-model` to see it: the kernel still answers 42/42 against the
+reference keys, and the deterministic intent index alone now routes **38 of 38**
+shipped prompts to the right capability. Early in this build the index managed
+barely half of them and the model was quietly carrying the difference; the fix
+was to make the index data-driven, not to lean harder on the model.
+
+The model still earns its place on phrasings the index has never seen — which
+is exactly what a stemmed-overlap index cannot generalise to — but it is no
+longer load-bearing for the shipped set. It buys the *frame*, never the
+*facts*, which is why removing it degrades coverage and never correctness.
 
 ---
 
@@ -232,16 +249,34 @@ Ask the same answerable question three ways:
 | `my BLR captain on the DEL overnight is out — options?` | ✗ **refused without a model** |
 
 The third needs the model lane. Offline, the index cannot resolve the referring
-expression "my BLR captain on the DEL overnight" to `C-1042`, scores below the
-confidence floor, and refuses.
+expression "my BLR captain on the DEL overnight" to a crew id, so it asks:
 
-**This is the honest shape of the trade-off, and it is measured, not asserted.**
-Running all 38 shipped prompts end-to-end through the natural-language layer
-with the model disabled, the index alone routes about half of them correctly.
-That is the number `crewops eval --e2e` prints, and it sits deliberately next to
-the kernel's 42/42 rather than replacing it: the kernel is exact, the routing
-layer is not, and reporting only the flattering number would be the kind of
-overstatement the brief penalises.
+```
+I need to know which crew member or trip before I can answer that.
+```
+
+That refusal is engineered, and it took two attempts. The first version of the
+index simply let the next-best capability answer — and `find_crew` happily
+returned **28 captains based at BLR**, which is fluent, instant, and about a
+different question. The rule that now prevents it is worth stating plainly,
+because it is the shape of the whole design:
+
+> When the highest-scoring capability is starved of an argument, and the
+> sentence named no crew member, trip, flight or tail at all, say what is
+> missing instead of serving the runner-up.
+
+The subject test in that sentence is load-bearing. *"If DX404 on 16 Sep is
+cancelled, how many passengers are affected?"* makes the crew-absence simulator
+score 1.10 on the word "affected" while missing a crew id — but the sentence
+did name `DX404`, and the flight tool answers it exactly. A question that named
+something gets answered; a question that named nothing gets turned back.
+
+**The trade-off is measured, not asserted.** Running all 38 shipped prompts
+end-to-end through the natural-language layer with the model disabled,
+`crewops eval --e2e` reports **38/38** reaching the right capability. That
+number sits deliberately next to the kernel's 42/42 rather than replacing it:
+they are different claims, they fail independently, and blending them would
+hide exactly the failure you care about.
 
 The deterministic lane is exact, fast and reproducible, and *brittle to
 phrasing*. The model lane is robust to phrasing and is the only component that
@@ -333,6 +368,8 @@ crewops/
   ui.html          the web desk (no runtime dependencies)
 tests/
   test_kernel.py   answer-key parity, traps, refusals, held-out shapes
+  test_routing.py  every shipped prompt reaches its capability; every answer
+                   survives the containment guard; horizons, what-ifs, parses
 docs/
   architecture.svg the LLM/deterministic boundary
 SAMPLES.md         real transcripts, including three real failures

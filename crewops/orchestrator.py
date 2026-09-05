@@ -57,6 +57,11 @@ class Plan:
     steps: list[Step]
     source: str = "index"        # index | model:<provider>
     why: str = ""
+    # True when the steps answer two INDEPENDENT halves of one sentence
+    # ("what is C-2087's rank, and their 28-day flight hours") rather than
+    # feeding each other. Both halves must reach the answer; picking a winner
+    # between them silently drops half of what was asked.
+    conjunctive: bool = False
 
     @property
     def tool(self) -> str:
@@ -64,12 +69,16 @@ class Plan:
         return self.steps[-1].tool if self.steps else ""
 
     @property
+    def tools(self) -> list[str]:
+        return [s.tool for s in self.steps]
+
+    @property
     def args(self) -> dict[str, Any]:
         return self.steps[-1].args if self.steps else {}
 
     def to_dict(self) -> dict[str, Any]:
         return {"tool": self.tool, "args": self.args, "why": self.why,
-                "parsed_by": self.source,
+                "parsed_by": self.source, "conjunctive": self.conjunctive,
                 "steps": [s.to_dict() for s in self.steps]}
 
 
@@ -95,8 +104,12 @@ PAT = {
     "station": re.compile(r"\b(?:BLR|DEL|BOM|MAA|HYD|CCU|COK|GOI)\b"),
     "date": re.compile(r"\b20\d{2}-\d{2}-\d{2}\b"),
     "time": re.compile(r"\b(\d{1,2}):(\d{2})\s*Z?\b"),
-    "duration": re.compile(r"(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?)\b",
-                           re.I),
+    # `[\s-]*` and not `\s*`: controllers write "a 90-minute delay" at least as
+    # often as "90 minutes", and the hyphenated form parsed to no duration at
+    # all -- which made simulate_delay fail its `needs` check and drop out of
+    # scoring entirely, so the whole question fell through to a roster lookup.
+    "duration": re.compile(
+        r"(\d+(?:\.\d+)?)[\s-]*(hours?|hrs?|h|minutes?|mins?)\b", re.I),
     # Ranks: plurals, abbreviations and CLASS words. A controller says
     # "captains", "FOs", "pilots" -- never "Senior Cabin Crew" in full. The
     # earlier singular-only pattern silently bound no rank at all, so "give me
@@ -107,9 +120,15 @@ PAT = {
         r"\b(senior cabin crew|scc|first officers?|f/?os?\b|cabin crew|"
         r"captains?|skippers?|pilots?|flight ?deck|crew members?)\b", re.I),
     "rating": re.compile(r"\b(a-?320|atr-? ?72|atr)\b", re.I),
-    # "5 pilots", "top 3", "first 10"
-    "count": re.compile(r"\b(?:top|first|any|need|give me|show me|list)?\s*"
-                        r"(\d{1,3})\s+(?=[a-z])", re.I),
+    # A number is a COUNT only when it is counting people. The first
+    # version matched any digits followed by a word, so "15 Sep",
+    # "28 days" and "45 or more hours" all became a result limit and
+    # silently truncated or mis-scored almost every dated question.
+    "count": re.compile(
+        r"(?:top|first|best|any|need|want|give me|show me|list)\s+(\d{1,3})"
+        r"|(\d{1,3})\s+(?:more\s+)?(?:pilots?|captains?|skippers?|"
+        r"first officers?|f/?os?|cabin crew|senior cabin crew|scc|"
+        r"crew members?|reserves?|standbys?|people|bodies)", re.I),
 }
 
 # A rank word can name a CLASS, not one rank. "pilots" is two ranks; asking for
@@ -142,6 +161,12 @@ class Entities:
     dates: list[str] = field(default_factory=list)
     times: list[str] = field(default_factory=list)
     hours: float | None = None
+    # "can C-3305 cover P-2291?" wants a VERDICT; "who can cover P-2291?" wants
+    # a LIST. Same vocabulary, opposite tools -- and word overlap alone cannot
+    # tell them apart, which is why both used to land on the ranker.
+    yes_no: bool = False
+    wh: bool = False
+    min_hours: float | None = None
     ranks: list[str] = field(default_factory=list)   # a class may be 2 ranks
     rating: str | None = None
     limit: int | None = None
@@ -169,6 +194,18 @@ def extract(question: str, snap: Snapshot) -> Entities:
     if m:
         v = float(m.group(1))
         e.hours = round(v / 60.0, 2) if m.group(2).lower().startswith("min") else v
+    stem = question.strip().lower()
+    e.yes_no = bool(re.match(
+        r"(can|could|is|are|does|do|will|would|may|should|any issue|ok to)\b",
+        stem))
+    e.wh = bool(re.match(r"(who|which|what|where|when|how many|list|show)\b",
+                         stem))
+    mh = re.search(r"(\d+(?:\.\d+)?)\s*(?:h(?:ours?)?\s*)?"
+                   r"(?:or more|\+|plus|and above|and over|or above)",
+                   question, re.I)
+    if mh:
+        e.min_hours = float(mh.group(1))
+
     r = PAT["rank"].search(question)
     if r:
         e.ranks = RANKS.get(r.group(1).lower().replace("/", "").replace("  ", " "), [])
@@ -178,7 +215,7 @@ def extract(question: str, snap: Snapshot) -> Entities:
                                RATINGS.get(g.group(1).lower()))
     c = PAT["count"].search(question)
     if c:
-        n = int(c.group(1))
+        n = int(c.group(1) or c.group(2))
         if 1 <= n <= 200:
             e.limit = n
 
@@ -196,7 +233,7 @@ def extract(question: str, snap: Snapshot) -> Entities:
         elif "yesterday" in low:
             e.dates = [(today - timedelta(days=1)).isoformat()]
         else:
-            m2 = re.search(r"(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|"
+            m2 = re.search(r"\b(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|"
                            r"sep|oct|nov|dec)", question, re.I)
             if m2:
                 mo = ["jan","feb","mar","apr","may","jun",
@@ -241,14 +278,26 @@ INTENTS: list[Intent] = [
         "who can cover", "who can take", "who is free to take", "cheapest cover",
         "find a replacement", "who else can operate", "recommend a replacement",
         "called in sick what now", "options to cover the trip",
-    ], needs=("pairing_or_crew",), boost=1.25),
+            "resolve their assignment",
+        "which reserves can cover",
+        "who is qualified and available",
+        "cheapest legal way to cover",
+        "the captain is sick which reserves cover it",
+        "cover the first officer",
+        "fix this assignment",
+], needs=("pairing_or_crew",), boost=1.25),
 
     Intent("check_legality", [
         "is it legal", "does anyone breach", "can they cover", "can he take",
         "if i move onto", "put them on", "swap them onto", "assign instead",
         "would that breach a limit", "does that violate a rule",
         "try them instead", "is that allowed",
-    ], needs=("crew",), boost=1.2),
+            "does any rule breach",
+        "if assigned to cover does anything breach",
+        "would assigning them breach a rule",
+        "is the assignment legal",
+        "legally operate their rostered duty",
+], needs=("crew",), boost=1.2),
 
     Intent("simulate_crew_unavailable", [
         "called in sick which flights", "what breaks if", "which flights uncrewed",
@@ -264,12 +313,20 @@ INTENTS: list[Intent] = [
     Intent("simulate_delay", [
         "is delayed", "delayed by minutes", "runs late", "tech delay",
         "does the crew breach after the delay",
-    ], needs=("duration",), boost=1.2),
+            "what should we do about the delay",
+        "after the delay what do we do",
+        "the delay causes an fdp breach",
+        "how do we handle the delay",
+], needs=("duration",), boost=1.2),
 
     Intent("simulate_cert_expiry", [
         "certificate lapsed", "licence expired", "recurrent training expired",
         "operate with an expired certificate", "cert has lapsed",
-    ], needs=("crew",)),
+            "recurrent training lapsed",
+        "their certificate has lapsed",
+        "can they legally operate with the lapsed certificate",
+        "is their licence still valid for the duty",
+], needs=("crew",)),
 
     Intent("minimal_repair", [
         "smallest change", "minimum change", "what would it take",
@@ -284,7 +341,11 @@ INTENTS: list[Intent] = [
     Intent("solve_joint_cover", [
         "both captains sick", "two crew are out", "simultaneous sick calls",
         "joint plan", "allocate across both",
-    ], boost=1.2),
+        "both captains are sick give the optimal joint crewing plan",
+        "optimal joint crewing plan",
+        "two aircraft need a captain at the same time",
+        "plan across both aircraft",
+    ], boost=1.3),
 
     Intent("cover_fragility", [
         "where are we thin", "single point of failure", "cover depth",
@@ -314,7 +375,13 @@ INTENTS: list[Intent] = [
     Intent("get_certifications", [
         "certificates expiring", "licence expiry", "medical validity",
         "whose certificates expire", "expiring within days",
-    ]),
+        # "certification" does not stem to "certificate", so the plural form
+        # controllers actually type matched nothing and the question fell
+        # through to a flight listing on the strength of "which" plus a date.
+        "which certification expire", "certification expiring between",
+        "which licence lapse before", "medical class expiring",
+        "whose recurrent training runs out",
+    ], boost=1.2),
 
     Intent("get_roster", [
         "who is assigned", "roster for", "crew on the pairing",
@@ -331,10 +398,19 @@ INTENTS: list[Intent] = [
         "who are the captains", "list the captains", "list the crew",
         "crew based at", "which crew are rated", "how many first officers",
         "show me the crew at", "which captains are based",
+        # NOT "give me captains": two tokens, both common, so it scored a
+        # perfect 1.0 on any sentence containing "give" and "captain" --
+        # including "both captains are sick, give the joint plan".
+        "i need a list of pilots", "find me crew who are",
+        "what is their base and rating", "what is their rank",
+        "what rating do they hold", "what base are they at",
+        "how many captains are there",
     ]),
 
     Intent("get_risk_signals", [
         "risk score", "disruption risk", "who is highest risk",
+        "standing morning briefing", "what should the briefing surface",
+        "which data points should the desk watch",
     ]),
 
     Intent("compute_duty_period", [
@@ -362,6 +438,13 @@ ENTITY_AFFINITY = {
     "rank":     ("rank", "role"),
     "rating":   ("rating", "aircraft_type"),
 }
+# Tools that return a VERDICT about one named person, versus tools that return
+# a SET. "can C-3305 cover P-2291" and "who can cover P-2291" share almost
+# every word and want opposite answers.
+VERDICT_TOOLS = {"check_legality", "simulate_cert_expiry", "minimal_repair"}
+LIST_TOOLS = {"find_crew", "find_flights", "get_reserves", "get_roster",
+              "get_certifications", "cover_fragility"}
+
 AFFINITY_WEIGHT = {
     "pairing": 0.30, "crew": 0.22, "duration": 0.30, "flight": 0.18,
     "aircraft": 0.16, "rank": 0.20, "rating": 0.14, "station": 0.12,
@@ -426,9 +509,16 @@ def score_intents(question: str, ents: Entities) -> list[tuple[float, Intent]]:
     have = {
         "crew": bool(ents.crew), "pairing": bool(ents.pairings),
         "station": bool(ents.stations), "duration": ents.hours is not None,
-        "pairing_or_crew": bool(ents.pairings or ents.crew or ents.flights),
+        # `aircraft` belongs here. bind_args already resolves a tail number to
+        # the trip it flies, so "the VT-DXF First Officer on 20 Sep" DOES name
+        # a subject -- but this set disagreed, so rank_cover_options failed its
+        # needs check, took the 0.25 penalty, and lost to a plain reserve list
+        # on the two most valuable questions in the set.
+        "pairing_or_crew": bool(ents.pairings or ents.crew or ents.flights
+                                or ents.aircraft),
     }
     scored: list[tuple[float, Intent]] = []
+    blocked: dict[str, tuple[float, list[str]]] = {}
     for intent, example_tokens in _INDEX:
         best = 0.0
         for toks in example_tokens:
@@ -450,11 +540,84 @@ def score_intents(question: str, ents: Entities) -> list[tuple[float, Intent]]:
                 continue
             if any(pn in params for pn in param_names):
                 s += AFFINITY_WEIGHT.get(kind, 0.10)
-        if intent.needs and not all(have.get(n, False) for n in intent.needs):
+
+        # Question SHAPE, not just vocabulary. A yes/no about a named person is
+        # a verdict question; a wh-question about a trip is a list question.
+        if ents.yes_no and ents.crew and intent.tool in VERDICT_TOOLS:
+            s += 0.28
+        if ents.wh and intent.tool in VERDICT_TOOLS:
+            s -= 0.18
+        if ents.yes_no and intent.tool in LIST_TOOLS:
+            s -= 0.12
+        # Two clock times plus a station is a closure window, near enough
+        # always. Nothing else in the vocabulary carries that signature.
+        if len(ents.times) >= 2 and ents.stations and intent.tool == \
+                "simulate_station_closure":
+            s += 0.45
+        if ents.min_hours is not None and "min_hours" in params:
+            s += 0.30
+        missing = [n for n in intent.needs if not have.get(n, False)]
+        if missing:
             s *= 0.25          # plausible, but we lack what it needs
         scored.append((s, intent))
+        blocked[intent.tool] = (s / 0.25 if missing else s, missing)
     scored.sort(key=lambda x: -x[0])
+    _BLOCKED.clear()
+    _BLOCKED.update(blocked)
     return scored
+
+
+# The pre-penalty score of every intent from the most recent scoring pass,
+# with whatever it was missing. Read by `starved_leader` below.
+_BLOCKED: dict[str, tuple[float, list[str]]] = {}
+
+_NEED_LABEL = {
+    "crew": "which crew member",
+    "pairing": "which trip",
+    "station": "which station",
+    "duration": "how long the delay is",
+    "pairing_or_crew": "which crew member or trip",
+}
+
+
+def starved_leader(ranked: list[tuple[float, Intent]], ents: Entities
+                   ) -> tuple[str, list[str]] | None:
+    """The capability that WOULD have led if it had its arguments.
+
+    "my BLR captain on the DEL overnight is out -- options?" is unmistakably a
+    cover question, but the referring expression resolves to nobody, so
+    rank_cover_options takes the needs penalty and a plain crew listing wins
+    the round. The desk then gets 28 captains at BLR presented as an answer:
+    fluent, instant, and about a different question.
+
+    Falling through like that is worse than refusing, because a refusal tells
+    the controller what to type next and a confident wrong list does not. So
+    when the starved intent would have beaten the actual winner outright, we
+    surface what it needed instead of serving the runner-up.
+
+    The subject test is what keeps this from firing on perfectly good
+    questions. "If DX404 on 16 Sep is cancelled, how many passengers are
+    affected?" makes simulate_crew_unavailable score high on the word
+    "affected" while missing a crew id -- but the sentence DID name a subject,
+    DX404, and find_flights consumes it and answers correctly. A question that
+    names a crew member, a trip, a flight or a tail has given us something to
+    act on, and the ranking is allowed to stand. Only a question that named
+    nothing at all gets turned back.
+    """
+    if not ranked:
+        return None
+    if ents.crew or ents.pairings or ents.flights or ents.aircraft:
+        return None
+    top_score = ranked[0][0]
+    best: tuple[float, str, list[str]] | None = None
+    for tool, (raw, missing) in _BLOCKED.items():
+        if not missing or raw < CONFIDENT or raw <= top_score:
+            continue
+        if best is None or raw > best[0]:
+            best = (raw, tool, missing)
+    if not best:
+        return None
+    return best[1], [_NEED_LABEL.get(m, m) for m in best[2]]
 
 
 # ==========================================================================
@@ -496,6 +659,21 @@ def bind_args(tool: str, ents: Entities, snap: Snapshot,
             if hit:
                 pairing = hit[0].pairing_id
                 break
+    if not pairing and ents.aircraft:
+        # "the VT-DXE captain on 16 Sep" names a TAIL, not a trip. Crew are
+        # assigned to pairings, so resolve the aircraft (plus a date when one
+        # is given) to the trip it flies -- otherwise every aircraft-shaped
+        # question falls through to a generic lookup.
+        ps = [p for p in snap.pairings.values() if p.aircraft == ents.aircraft[0]]
+        if ents.dates:
+            ps = [p for p in ps
+                  if any(d.date == ents.dates[0] for d in p.days)] or ps
+        if ps:
+            pairing = sorted(ps, key=lambda p: p.days[0].date)[0].pairing_id
+
+    # the person being replaced, when the question named a role but no id
+    if pairing and not crew and ents.rank:
+        crew = snap.pairings[pairing].crew_in_role(ents.rank)
 
     put("crew_id", crew)
     put("pairing_id", pairing)
@@ -546,13 +724,55 @@ def bind_args(tool: str, ents: Entities, snap: Snapshot,
         a["metric"] = "flight"
         a["window_days"] = 28
     if tool == "get_certifications" and ents.dates:
-        a["expiring_after"] = ents.dates[0]
-        a["expiring_before"] = (_date.fromisoformat(ents.dates[0])
-                                + timedelta(days=30)).isoformat()
+        # Two dates in the sentence is an explicit window ("between the 14th
+        # and March"); one date plus "before/by" is an open-ended deadline;
+        # one bare date defaults to the next 30 days, which is what a
+        # controller means by "expiring soon".
+        if len(ents.dates) >= 2:
+            a["expiring_after"], a["expiring_before"] = sorted(ents.dates)[:2]
+        elif re.search(r"\b(before|by|prior to|ahead of|until)\b", question,
+                       re.I):
+            a["expiring_after"] = snap.horizon[0].isoformat()
+            a["expiring_before"] = ents.dates[0]
+        else:
+            a["expiring_after"] = ents.dates[0]
+            a["expiring_before"] = (_date.fromisoformat(ents.dates[0])
+                                    + timedelta(days=30)).isoformat()
     if tool == "draft_notification":
         low = question.lower()
         a["audience"] = ("occ" if "occ" in low else
                          "duty_manager" if "manager" in low else "crew")
+    if tool == "duty_hours" and ents.min_hours is not None:
+        a["min_hours"] = ents.min_hours
+        a.pop("crew_id", None)      # a threshold question is about everyone
+
+    if tool == "solve_joint_cover":
+        # Two tails named in one sentence is the simultaneous-disruption case.
+        # Without this the tool was unreachable from the index: its only
+        # required argument is a list that nothing ever built.
+        evs = []
+        for tail in ents.aircraft:
+            ps = [p for p in snap.pairings.values() if p.aircraft == tail]
+            if ents.dates:
+                ps = [p for p in ps
+                      if any(d.date == ents.dates[0] for d in p.days)] or ps
+            if not ps:
+                continue
+            pid = sorted(ps, key=lambda p: p.days[0].date)[0].pairing_id
+            who = snap.pairings[pid].crew_in_role(ents.rank or "Captain")
+            if who:
+                evs.append({"crew_id": who, "pairing_id": pid})
+        for cid in ents.crew:
+            for p in snap.pairings_for_crew(cid):
+                evs.append({"crew_id": cid, "pairing_id": p.pairing_id})
+                break
+        seen, uniq = set(), []
+        for ev in evs:
+            if ev["pairing_id"] not in seen:
+                seen.add(ev["pairing_id"])
+                uniq.append(ev)
+        if len(uniq) >= 2:
+            a["events"] = uniq
     return a
 
 
@@ -570,18 +790,113 @@ CONFIDENT = 0.75
 FLOOR = 0.40
 
 
+DOMINANT = 0.22   # how far ahead the top intent must be to own the question
+
+
 def plan_from_index(question: str, ents: Entities, snap: Snapshot,
                     min_score: float = FLOOR) -> Plan | None:
-    """Deterministic single-step plan. Fast, reproducible, no network."""
-    for s, intent in score_intents(question, ents)[:4]:
+    """Deterministic single-step plan. Fast, reproducible, no network.
+
+    When the best-scoring capability cannot bind its required arguments we do
+    NOT quietly try the next one down. That fallthrough is precisely how "which
+    flights are affected by the HYD closure" became a plain flight listing: the
+    closure simulator was the top match by a mile, lacked a time window, and the
+    runner-up answered a different question with total confidence.
+
+    So if the leader is DOMINANT-ly ahead and cannot be bound, we raise the
+    missing argument as a clarifying question instead. Only genuinely close
+    calls fall through to the next candidate.
+    """
+    all_ranked = score_intents(question, ents)
+    starved = starved_leader(all_ranked, ents)
+    if starved:
+        tool, missing = starved
+        raise PlanError(
+            f"I need to know {', '.join(missing)} before I can answer that.",
+            have=f"this reads as a {tool.replace('_', ' ')} question",
+            would_need=", ".join(missing))
+
+    ranked = all_ranked[:4]
+    for i, (s, intent) in enumerate(ranked):
         if s < min_score:
             break
         args = bind_args(intent.tool, ents, snap, question)
-        if [r for r in REGISTRY[intent.tool].required if r not in args]:
+        missing = _unbound(intent.tool, args)
+        if missing:
+            runner_up = ranked[i + 1][0] if i + 1 < len(ranked) else 0.0
+            if s - runner_up >= DOMINANT:
+                raise PlanError(
+                    f"I need {', '.join(missing)} to answer that.",
+                    have=f"this looks like a {intent.tool.replace('_', ' ')} "
+                         f"question",
+                    would_need=", ".join(missing))
             continue
+
+        second = _conjunct(question, ranked, i, ents, snap)
+        if second:
+            s2, tool2, args2 = second
+            return Plan(
+                [Step(tool2, args2, "second half of the question"),
+                 Step(intent.tool, args, intent.examples[0])],
+                "index",
+                f"two-part question: {tool2} ({s2:.2f}) + {intent.tool} "
+                f"({s:.2f})",
+                conjunctive=True)
+
         return Plan([Step(intent.tool, args, intent.examples[0])], "index",
                     f"matched '{intent.examples[0]}' (score {s:.2f})")
     return None
+
+
+# A sentence that asks two things joined by "and" / a comma, e.g.
+# "What is C-2087's rank, AND total flight hours over the 28 days ending ...".
+_CONJ = re.compile(r",\s*(?:and|as well as)\b|\band\b\s+(?:also\s+)?(?:their|"
+                   r"his|her|the|total|what)\b", re.I)
+
+
+def _conjunct(question: str, ranked: list[tuple[float, Intent]], i: int,
+              ents: Entities, snap: Snapshot
+              ) -> tuple[float, str, dict[str, Any]] | None:
+    """The runner-up when the sentence genuinely asked for two things.
+
+    Deliberately narrow. Answering half a question and sounding certain is the
+    failure mode this system exists to avoid, but so is chaining tools that
+    were never asked for -- so all four conditions must hold:
+
+      * the sentence carries an explicit conjunction, not just a list comma;
+      * both capabilities are plain retrieval (never chain two simulations,
+        which would compose two hypotheticals into one unlabelled answer);
+      * the runner-up is CONFIDENT on its own, not merely next in line;
+      * the two are within DOMINANT of each other -- a clear leader means the
+        question had one subject and the runner-up is noise.
+    """
+    if not _CONJ.search(question):
+        return None
+    lead_score, lead = ranked[i]
+    if REGISTRY[lead.tool].kind != "retrieval":
+        return None
+    for s2, cand in ranked[i + 1:]:
+        if cand.tool == lead.tool or s2 < CONFIDENT:
+            continue
+        if lead_score - s2 >= DOMINANT:
+            break
+        if REGISTRY[cand.tool].kind != "retrieval":
+            continue
+        args2 = bind_args(cand.tool, ents, snap, question)
+        if _unbound(cand.tool, args2):
+            continue
+        return s2, cand.tool, args2
+    return None
+
+
+def _unbound(tool: str, args: dict[str, Any]) -> list[str]:
+    """Required arguments the binder could not supply."""
+    t = REGISTRY[tool]
+    missing = [r for r in t.required if r not in args]
+    for group in getattr(t, "requires_one_of", ()) or ():
+        if not any(g in args for g in group):
+            missing.append(" or ".join(group))
+    return missing
 
 
 PLANNER_SYSTEM = """You are the planner for an airline Crew Control advisor.
@@ -694,7 +1009,7 @@ def validate(plan: Plan) -> None:
             if ref and int(ref[0]) >= i:
                 raise PlanError(
                     f"Step {i} references step {ref[0]}, which has not run yet.")
-        missing = [r for r in t.required if r not in st.args]
+        missing = _unbound(st.tool, st.args)
         if missing:
             raise PlanError(f"I need {', '.join(missing)} to answer that.",
                             would_need=", ".join(missing))
@@ -745,4 +1060,14 @@ def execute(plan: Plan, snap: Snapshot) -> Execution:
         st.args = args                       # record what actually ran
         results.append(payload)
         ledger.extend(led)
+
+    # A conjunctive plan has no winning step -- both halves were asked for, so
+    # both must survive into the answer. `final` is still the leader's payload
+    # (every renderer keys off plan.tool), with the other half carried beside
+    # it rather than discarded.
+    if plan.conjunctive and len(results) > 1 and isinstance(results[-1], dict):
+        merged = dict(results[-1])
+        merged["also"] = [{"tool": st.tool, "result": r}
+                          for st, r in zip(plan.steps[:-1], results[:-1])]
+        results[-1] = merged
     return Execution(results, ledger)

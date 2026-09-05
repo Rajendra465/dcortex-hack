@@ -458,7 +458,12 @@ EXPECTED_TOOL = {
     "Q16": "get_risk_signals", "Q17": "simulate_crew_unavailable",
     "Q18": "check_legality", "Q19": "simulate_station_closure",
     "Q20": "simulate_delay", "Q21": "check_legality",
-    "Q22": "simulate_cert_expiry", "Q23": "compute_duty_period",
+    # Q22 asks whether a rostered duty is legal; the binding rule happens to be
+    # a certificate. That is check_legality's job -- it returns legal=false,
+    # RULE-CERT-06, 2026-09-19, which is the answer key exactly.
+    # simulate_cert_expiry is the WHAT-IF tool ("suppose this lapses"), and
+    # naming it here was an authoring error in this map, not a routing failure.
+    "Q22": "check_legality", "Q23": "compute_duty_period",
     "Q24": "check_legality", "Q25": "find_flights", "Q26": "duty_hours",
     "Q27": "rank_cover_options", "Q28": "check_legality",
     "Q29": "simulate_station_closure", "Q30": "find_flights",
@@ -488,7 +493,13 @@ def run_e2e(snap: Snapshot | None = None, data_dir: str | None = None,
         a = adv.ask(q["prompt"])
         ms = (time.perf_counter() - t0) * 1000
         got = f"REFUSED:{a.refusal.kind}" if a.refusal else a.plan.tool
-        good = got == want
+        # A two-part question ("their rank, AND their 28-day hours") is
+        # answered by a two-step plan, and reaching the capability anywhere in
+        # that plan is a hit -- scoring only the last step would mark a
+        # complete answer wrong for the order its halves happened to run in.
+        good = got == want or (a.plan is not None and want in a.plan.tools)
+        if good and got != want:
+            got = " + ".join(a.plan.tools)
         ok += good
         refused += bool(a.refusal)
         rows.append({"id": q["question_id"], "tier": q["tier"], "want": want,

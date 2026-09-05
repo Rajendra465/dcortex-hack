@@ -27,15 +27,24 @@ from .rules import Ledger, duty_period, fdp_limit
 # --------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Event:
+    """Base for every disruption overlay.
+
+    `kw_only` is load-bearing, not style. `type` is declared first and every
+    subclass field comes after it, so `SickCrew("C-1042")` bound the crew id to
+    `type` and left `crew_id` empty -- an overlay that stripped nobody, applied
+    silently, and produced a confident answer about an undisrupted world. There
+    is no safe positional order here, so there are no positional arguments.
+    """
+
     type: str = "EVENT"
 
     def describe(self) -> str:  # pragma: no cover - overridden
         return self.type
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SickCrew(Event):
     crew_id: str = ""
     pairing_id: str | None = None
@@ -47,7 +56,7 @@ class SickCrew(Event):
         return f"{self.crew_id} unavailable{p}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CertExpiry(Event):
     crew_id: str = ""
     cert_type: str = "recurrent_training"
@@ -57,7 +66,7 @@ class CertExpiry(Event):
         return f"{self.crew_id} {self.cert_type} lapsed"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class StationClosure(Event):
     station: str = ""
     start_utc: str = ""
@@ -68,7 +77,7 @@ class StationClosure(Event):
         return f"{self.station} closed {self.start_utc}..{self.end_utc}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Delay(Event):
     delay_hours: float = 0.0
     aircraft: str | None = None
@@ -184,6 +193,13 @@ def analyse_sick(snap: Snapshot, crew_id: str, pairing_id: str | None = None,
     pax_first = seats_by_day.get(days[0], 0) if days else 0
 
     led.add("uncovered_flights", len(immediate) + len(downstream))
+    # The summary reports the split, not just the total ("3 uncrewed today,
+    # 3 more later"), so both halves have to be ledgered or the answer quotes
+    # figures it cannot cite.
+    led.add("uncovered_day1", len(immediate),
+            derivation=f"legs on {days[0]}" if days else "no affected days")
+    led.add("uncovered_later", len(downstream),
+            derivation="legs on every subsequent day of the trip")
     led.add("passengers_at_risk_day1", pax_first, "seats",
             source="flights.json seats", derivation="sum of seats on day-1 legs")
     for d in days:
@@ -329,6 +345,7 @@ def analyse_delay(snap: Snapshot, delay_hours: float, aircraft: str | None = Non
     led.add("fdp_before", fdp, "h")
     led.add("delay_hours", delay_hours, "h")
     led.add("fdp_after_delay", new_fdp, "h", derivation=f"{fdp} + {delay_hours}")
+    led.add("sectors", pday.sectors)
     led.add("fdp_limit", lim, "h",
             derivation=f"13.0 - 0.5 x max(0, {pday.sectors} - 2)")
     led.add("fdp_overage", round(new_fdp - lim, 2), "h")

@@ -19,8 +19,9 @@ import json
 import re
 import sys
 
-from .agent import Advisor, Answer
+from .agent import Advisor, Answer, Session
 from .data import assert_shape, load
+from .events import SickCrew
 from .kernel import cover_fragility, latent_breaches, reserve_coverage_gaps
 
 try:
@@ -229,7 +230,13 @@ def cmd_ask(args: argparse.Namespace) -> int:
 def cmd_chat(args: argparse.Namespace) -> int:
     out = Out()
     snap = load(args.data)
-    adv = Advisor(snap, use_model=not args.no_model)
+    # A Session, not a bare Advisor. The desk's second question is almost
+    # always "and if I move him instead?" -- which is unanswerable without the
+    # ids the previous turn resolved -- and its third is a second disruption
+    # layered on the first. Both are Session's job; running the single-shot
+    # Advisor here quietly threw that away every turn.
+    sess = Session(snap, use_model=not args.no_model)
+    adv = sess.advisor
 
     out.p()
     out.p(f"  [bold]{BANNER}[/bold]")
@@ -239,7 +246,8 @@ def cmd_chat(args: argparse.Namespace) -> int:
           + (f"rules + {adv.model_label}" if adv.model_available
              else "rules only (no model key — answers are still exact)")
           + "[/dim]")
-    out.p("  [dim]:brief  :evidence  :quit[/dim]")
+    out.p("  [dim]:brief  :evidence  :whatif <crew> sick  :stack  :reset  "
+          ":quit[/dim]")
 
     for b in latent_breaches(snap):
         out.p()
@@ -265,7 +273,51 @@ def cmd_chat(args: argparse.Namespace) -> int:
         if q == ":brief":
             cmd_brief(argparse.Namespace(data=args.data))
             continue
-        render_answer(out, adv.ask(q), show_evidence=evidence)
+        if q == ":stack":
+            _show_stack(out, sess)
+            continue
+        if q == ":reset":
+            sess.reset()
+            out.p("  [dim]what-if stack cleared — back to the live "
+                  "snapshot[/dim]")
+            continue
+        if q.startswith(":whatif"):
+            _push_whatif(out, sess, q[len(":whatif"):].strip())
+            continue
+        render_answer(out, sess.ask(q), show_evidence=evidence)
+
+
+def _show_stack(out: Out, sess: Session) -> None:
+    if not sess.what_if:
+        out.p("  [dim]no what-ifs stacked — answers are against the live "
+              "snapshot[/dim]")
+        return
+    out.p()
+    out.p("  [bold]WHAT-IF STACK[/bold] [dim](answers are against this "
+          "world)[/dim]")
+    for i, d in enumerate(sess.what_if, 1):
+        out.p(f"    {i}. {d}")
+    out.p()
+
+
+def _push_whatif(out: Out, sess: Session, spec: str) -> None:
+    """`:whatif C-1042 sick` — stack a disruption and keep answering in it.
+
+    Deliberately narrow syntax. A what-if that is ambiguous about WHO is out
+    is worse than no what-if at all, so this refuses rather than guesses.
+    """
+    m = re.search(r"\b(C-\d{4})\b", spec, re.I)
+    if not m:
+        out.p("  [yellow]:whatif needs a crew id[/yellow] "
+              "[dim]e.g. :whatif C-1042 sick[/dim]")
+        return
+    cid = m.group(1).upper()
+    if cid not in sess.base.crew:
+        out.p(f"  [yellow]{cid} is not in this dataset[/yellow]")
+        return
+    sess.push_event(SickCrew(crew_id=cid))
+    out.p(f"  [dim]stacked: {sess.what_if[-1]} — "
+          f"{len(sess.what_if)} overlay(s) active, :reset to clear[/dim]")
 
 
 def _runs(hours: list[int]) -> str:

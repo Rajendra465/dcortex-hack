@@ -19,7 +19,7 @@ from typing import Any
 from .agent import Advisor
 from .conformance import report as conformance_report
 from .data import Snapshot, load
-from .evaluate import run as run_eval
+from .evaluate import run as run_eval, run_e2e
 from .kernel import cover_fragility, latent_breaches, reserve_coverage_gaps
 
 _STATE: dict[str, Any] = {}
@@ -99,6 +99,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(run_eval(snap).to_dict())
             elif path == "/api/conformance":
                 self._json(conformance_report(snap))
+            elif path == "/api/routing":
+                # The second, separate score: not "is the arithmetic right"
+                # but "does a typed sentence reach the capability that owns
+                # it". Cached after the first call -- it replays all 38
+                # shipped prompts and the UI asks for it on page load.
+                if _STATE.get("routing") is None:
+                    _STATE["routing"] = run_e2e(snap, use_model=False)
+                r = dict(_STATE["routing"])
+                r.pop("rows", None)
+                self._json(r)
             elif path == "/api/examples":
                 self._json(EXAMPLES)
             else:
