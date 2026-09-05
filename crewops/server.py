@@ -221,6 +221,76 @@ def _outreach(snap: Snapshot, data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_SCENARIO_CACHE: dict[str, Any] = {}
+
+
+def _scenarios() -> list[dict[str, Any]]:
+    """The shipped scenarios, read once from scenarios.json."""
+    if "list" not in _SCENARIO_CACHE:
+        d = _STATE.get("data_dir") or ""
+        try:
+            with open(os.path.join(d, "scenarios.json"), encoding="utf-8") as fh:
+                _SCENARIO_CACHE["list"] = json.load(fh)
+        except Exception:
+            _SCENARIO_CACHE["list"] = []
+    return _SCENARIO_CACHE["list"]
+
+
+def _scenario_events(sid: str) -> list[Any]:
+    """The real event(s) for a scenario id, straight out of the dataset.
+
+    This was a hand-written if/elif that had drifted from the data: S1 fired
+    C-1042's sick call instead of C-3231's, S3 (a station closure) fired a sick
+    call, S4 (a delay) fired the closure, and S6 did not exist at all. Every one
+    of those buttons demonstrated something other than its own label. Reading
+    the file means the six demo what they say, and a held-out scenario dropped
+    into the dataset works with no code change.
+    """
+    from .events import CertExpiry, Delay, SickCrew, StationClosure
+    scen = next((x for x in _scenarios() if x.get("scenario_id") == sid), None)
+    if not scen:
+        return []
+    ev = scen.get("event", {})
+    kind = ev.get("type")
+    if kind == "SICK_CREW":
+        return [SickCrew(crew_id=ev["crew_id"], pairing_id=ev.get("pairing_id"))]
+    if kind == "MULTI_SICK":
+        return [SickCrew(crew_id=e["crew_id"], pairing_id=e.get("pairing_id"))
+                for e in ev.get("events", []) if e.get("crew_id")]
+    if kind == "DELAY":
+        return [Delay(delay_hours=ev.get("delay_hours"),
+                      aircraft=ev.get("aircraft"), date=ev.get("date"))]
+    if kind == "STATION_CLOSURE":
+        w = ev.get("window_utc") or {}
+        return [StationClosure(station=ev.get("station"),
+                               start_utc=w.get("start") or ev.get("start_utc"),
+                               end_utc=w.get("end") or ev.get("end_utc"))]
+    if kind == "CERT_EXPIRY":
+        return [CertExpiry(crew_id=ev.get("crew_id"))]
+    return []
+
+
+def _scenario_list() -> list[dict[str, Any]]:
+    """What the desk needs to offer them: what happens, to whom, and when."""
+    out = []
+    for sc in _scenarios():
+        ev = sc.get("event", {})
+        sid = sc.get("scenario_id")
+        who = ev.get("crew_id") or ", ".join(
+            e.get("crew_id", "") for e in ev.get("events", [])) or ev.get("station") or ev.get("aircraft")
+        out.append({
+            "id": sid,
+            "title": sc.get("title"),
+            "difficulty": sc.get("difficulty"),
+            "type": ev.get("type"),
+            "subject": who,
+            "narrative": ev.get("narrative", ""),
+            "reported_utc": ev.get("reported_utc") or (ev.get("events") or [{}])[0].get("reported_utc"),
+            "runnable": bool(_scenario_events(sid)),
+        })
+    return out
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -273,6 +343,8 @@ class Handler(BaseHTTPRequestHandler):
                 r = dict(_STATE["routing"])
                 r.pop("rows", None)
                 self._json(r)
+            elif path == "/api/scenarios":
+                self._json(_scenario_list())
             elif path == "/api/examples":
                 self._json(EXAMPLES)
             elif path == "/api/stream":
@@ -561,20 +633,10 @@ class Handler(BaseHTTPRequestHandler):
                             elif ev_type == "STATION_CLOSURE":
                                 entry["s"].push_event(StationClosure(station=dynamic_event.get("station"), start_utc=dynamic_event.get("start_utc"), end_utc=dynamic_event.get("end_utc")))
                         else:
-                            if scenario == "S1" or scenario == "S2" or scenario == "S3":
-                                entry["s"].push_event(SickCrew(crew_id="C-1042", pairing_id="P-2291"))
-                            elif scenario == "S4":
-                                entry["s"].push_event(StationClosure(
-                                    station="BLR",
-                                    start_utc="2026-09-17T08:00:00Z",
-                                    end_utc="2026-09-17T14:00:00Z",
-                                ))
-                            elif scenario == "S5":
-                                entry["s"].push_event(Delay(
-                                    delay_hours=1.5,
-                                    aircraft="VT-DXA",
-                                    date="2026-09-16",
-                                ))
+                            evs = _scenario_events(scenario) if scenario else []
+                            if evs:
+                                for e in evs:
+                                    entry["s"].push_event(e)
                             else:
                                 cid = body.get("crew_id")
                                 if not cid or cid not in _STATE["snap"].crew:
@@ -639,8 +701,37 @@ def _page() -> bytes:
         return fh.read().encode("utf-8")
 
 
+def _restore_default_rulebook(data_dir: str | None) -> None:
+    """Start every session on the rulebook we were given.
+
+    /api/set_region copies rules_<region>.json over rules.json, which is a
+    permanent edit to the dataset. Switching to EU once and never switching
+    back left a 65h weekly duty cap and a 14h FDP in place, so the advisor
+    answered every later question against a rulebook the answer keys do not
+    use -- and reported C-2087 LEGAL for P-2291 on 61.33h, because 61.33 is
+    under 65. Nothing warned anyone; the file simply stayed changed.
+
+    The region switch is a good feature and it stays. It just cannot be
+    allowed to decide what tomorrow's default is.
+    """
+    import shutil
+    d = data_dir or os.environ.get("CREWOPS_DATA_DIR") or ""
+    src = os.path.join(d, "rules_in.json")
+    dst = os.path.join(d, "rules.json")
+    if os.path.isfile(src) and os.path.isfile(dst):
+        try:
+            if open(src, encoding="utf-8").read() != open(dst, encoding="utf-8").read():
+                shutil.copy(src, dst)
+                print("  rulebook reset to the shipped DGCA ruleset "
+                      "(a previous region switch had left it changed)")
+        except OSError:
+            pass
+
+
 def serve(host: str = "127.0.0.1", port: int = 8787,
           data_dir: str | None = None, use_model: bool | None = None) -> int:
+    _restore_default_rulebook(
+        data_dir or os.environ.get("CREWOPS_DATA_DIR") or "Problem Statement/data")
     snap = load(data_dir)
     _STATE["snap"] = snap
     _STATE["data_dir"] = data_dir or os.environ.get("CREWOPS_DATA_DIR") or "Problem Statement/data"
