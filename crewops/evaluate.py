@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from .data import Snapshot, load
+from .data import DEFAULT_DATA_DIR, Snapshot, load
 from .events import SickCrew, resolve_multi
 from .tools import REGISTRY, Unanswerable
 
@@ -274,9 +274,7 @@ def _pairing_for(snap: Snapshot, aircraft: str, day: str) -> str:
 
 def run(snap: Snapshot | None = None, data_dir: str | None = None) -> Report:
     snap = snap or load(data_dir)
-    d = data_dir or os.environ.get("CREWOPS_DATA_DIR") or os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "extracted", "DCortex - Synthetic dataset", "data")
+    d = data_dir or os.environ.get("CREWOPS_DATA_DIR") or DEFAULT_DATA_DIR
     with open(os.path.join(d, "questions.json"), encoding="utf-8") as fh:
         questions = json.load(fh)
     with open(os.path.join(d, "scenarios.json"), encoding="utf-8") as fh:
@@ -479,9 +477,7 @@ def run_e2e(snap: Snapshot | None = None, data_dir: str | None = None,
     """Route every shipped prompt through Advisor.ask and score the tool chosen."""
     from .agent import Advisor
     snap = snap or load(data_dir)
-    d = data_dir or os.environ.get("CREWOPS_DATA_DIR") or os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "extracted", "DCortex - Synthetic dataset", "data")
+    d = data_dir or os.environ.get("CREWOPS_DATA_DIR") or DEFAULT_DATA_DIR
     with open(os.path.join(d, "questions.json"), encoding="utf-8") as fh:
         questions = json.load(fh)
 

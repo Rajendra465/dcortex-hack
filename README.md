@@ -32,7 +32,21 @@ python -m crewops chat          # interactive desk
 python -m crewops ask "who is on reserve at BLR on 2026-09-15?"
 python -m crewops conformance   # rulebook vs data disagreements
 python -m crewops serve         # the web desk on http://127.0.0.1:8787
+./run_occ.sh                    # single-command launch with health checks
 ```
+
+### OCC Command Center (Alpha-Fin Enterprise Design System)
+
+The web desk has been elevated into an enterprise Airline Operations Control Center (OCC) command suite, adopting the visual design, dark glassmorphic tokens, and micro-interactions from the Alpha-Fin financial intelligence suite:
+
+* **Concentric `.brand-arcs` Geometric Watermark:** Subtle 42rem/26rem circular emblem arcs in the header and KPI cards providing distinctive aerospace brand depth.
+* **Ambient `.app-mesh` Depth:** Multi-point radial mesh gradients (`#090b11`, `#121622`) creating an glare-free glass cockpit environment for 24/7 operations.
+* **Smooth Cubic Count-Up Telemetry (`useCountUp`):** Pure cubic ease-out animations (`1 - Math.pow(1 - t, 3)`) animating flight counts, active crew rosters, and standby capacity.
+* **6-Axis Polygonal Crew Recovery Legality Radar (`TwinRadar`):** An interactive SVG radar mapping every recovery candidate across the 6 CAR Section 7 dimensions (FDP Headroom, 12h Rest Buffer, 7-Day 60h Cap, 28-Day 100h Cap, Base Reachability, and Fleet Currency). Features dual-candidate comparative overlays (Optimal in `#00ff87` vs Alternative in `#ffb300`) and 6 meters carrying the exact numbers.
+* **Dynamic `.flash-row` Asset Highlighting:** Affected flight pairings and crew members flash with a cyan aura upon counterfactual scenario triggers.
+* **Interactive Pilot Legality Inspector:** Click any pilot across the 150-crew roster or 16-reserve standby pool to inspect their real-time CAR Section 7 compliance radar and rolling duty margins.
+* **Multi-Channel Crew Dispatch Drawer:** Automatically generates formatted callouts across WhatsApp, ACARS (ARINC-620), SMS, and synthesized Voice Briefings.
+
 
 The web desk is the best way to see it. One thing there is worth arriving for:
 
