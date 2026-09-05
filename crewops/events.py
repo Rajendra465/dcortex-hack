@@ -372,6 +372,52 @@ def analyse_delay(snap: Snapshot, delay_hours: float, aircraft: str | None = Non
                       "legs_to_shed": legs[k:]}
             break
 
+    # RULE-REST-04 downstream. The delay pushes RELEASE later, which eats the
+    # rest before each crew member's next report. FDP-01 alone cannot see this:
+    # a duty can sit comfortably inside its own limit and still leave the crew
+    # short of rest for tomorrow. On a two-day pairing the overnight is the
+    # tightest gap in the whole roster, so that is where it bites first.
+    min_rest = 12.0
+    new_release = _rel + timedelta(hours=delay_hours)
+    led.add("min_rest_hours", min_rest, "h", source="rules.json RULE-REST-04")
+    rest_breaches: list[dict[str, Any]] = []
+    for cid, role in p.crew:
+        nxt = None
+        for pp in snap.pairings.values():
+            if cid not in [c[0] for c in pp.crew]:
+                continue
+            for dd in pp.days:
+                if dd.report > _rel and (nxt is None or dd.report < nxt[1].report):
+                    nxt = (pp, dd)
+        if nxt is None:
+            continue          # nothing after this inside the roster horizon
+        npp, ndd = nxt
+        rest = round(hours(ndd.report - new_release), 2)
+        if rest < min_rest - 1e-6:
+            led.add(f"rest_hours[{cid}]", rest, "h",
+                    derivation=f"{ndd.report:%Y-%m-%d %H:%M} report - "
+                               f"{new_release:%Y-%m-%d %H:%M} delayed release")
+            rest_breaches.append({
+                "crew_id": cid, "role": role,
+                "next_pairing": npp.pairing_id, "next_date": ndd.date,
+                "rest_hours": rest,
+                "shortfall_hours": round(min_rest - rest, 2),
+                "rule": "RULE-REST-04",
+            })
+    rest_breach = bool(rest_breaches)
+    if rest_breach:
+        led.add("rest_breach_count", len(rest_breaches))
+
+    rest_detail = ""
+    if rest_breach:
+        who = ", ".join(b["crew_id"] for b in rest_breaches)
+        w = rest_breaches[0]
+        rest_detail = (
+            f"RULE-REST-04: the delayed release leaves {w['rest_hours']}h before "
+            f"{w['next_pairing']} reports on {w['next_date']} - {w['shortfall_hours']}h "
+            f"short of the {min_rest}h minimum. Affects {len(rest_breaches)} crew: {who}."
+        )
+
     return Impact(
         event={"type": "DELAY", "aircraft": p.aircraft,
                "pairing_id": p.pairing_id, "date": pday.date,
@@ -379,7 +425,9 @@ def analyse_delay(snap: Snapshot, delay_hours: float, aircraft: str | None = Non
         summary=(
             f"{p.aircraft} delayed {delay_hours}h on {pday.date}: duty runs "
             f"{new_fdp}h against a {lim}h limit ({pday.sectors} sectors) - "
-            + ("BREACH." if breach else "still legal.")
+            + ("BREACH." if breach else
+               "within its own FDP limit." if rest_breach else "still legal.")
+            + (f" But {rest_detail}" if rest_breach else "")
         ),
         data={
             "pairing_id": p.pairing_id, "sectors": pday.sectors,
@@ -391,6 +439,9 @@ def analyse_delay(snap: Snapshot, delay_hours: float, aircraft: str | None = Non
                 f"complete the full day." if breach else ""),
             "max_legal_prefix": prefix,
             "legs_to_shed": prefix.get("legs_to_shed", []),
+            "rest_breach": rest_breach,
+            "rest_breaches": rest_breaches,
+            "rest_detail": rest_detail,
         },
         ledger=led,
     )
