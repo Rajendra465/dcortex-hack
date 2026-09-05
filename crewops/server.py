@@ -385,8 +385,12 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         snap: Snapshot = _STATE["snap"]
         try:
-            if path in ("/", "/index.html"):
-                self._send(200, _page(), "text/html; charset=utf-8")
+            if path in ("/", "/index.html", "/desk", "/desk/"):
+                # The desk is the product. /desk still resolves so any link
+                # already handed out keeps working.
+                with open(DESK_PATH, encoding="utf-8") as fh:
+                    self._send(200, fh.read().encode("utf-8"),
+                               "text/html; charset=utf-8")
             elif path == "/api/health":
                 adv: Advisor = _STATE["advisor"]
                 self._json({
@@ -415,9 +419,9 @@ class Handler(BaseHTTPRequestHandler):
                 r = dict(_STATE["routing"])
                 r.pop("rows", None)
                 self._json(r)
-            elif path in ("/desk", "/desk/"):
-                with open(DESK_PATH, encoding="utf-8") as fh:
-                    self._send(200, fh.read().encode("utf-8"), "text/html; charset=utf-8")
+            elif path in ("/cockpit", "/cockpit/"):
+                # The v3 multi-panel cockpit, kept reachable rather than deleted.
+                self._send(200, _page(), "text/html; charset=utf-8")
             elif path == "/api/scenarios":
                 self._json(_scenario_list())
             elif path == "/api/examples":
