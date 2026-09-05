@@ -98,11 +98,20 @@ class Ledger:
 # --------------------------------------------------------------------------
 
 
-def fdp_limit(sectors: int, params: dict[str, Any]) -> float:
+def fdp_limit(sectors: int, params: dict[str, Any] | None = None) -> float:
     """RULE-FDP-01. Base fdp, minus reduction per sector beyond the free sectors.
-    
+
     Counted PER DUTY DAY, not per pairing: 2 legs -> 13.0, 3 -> 12.5, 4 -> 12.0.
+
+    `params` became required in a refactor that updated one of the five call
+    sites. The other four -- both delay paths in events.py, the legal-prefix
+    search, and compute_duty_period -- raised TypeError, which took out every
+    delay simulation and the duty-period tool with it. It is optional again and
+    falls back to the shipped rules.json values, so a caller that has the
+    snapshot can pass the real params and a caller that does not still gets the
+    rulebook rather than an exception.
     """
+    params = params or {}
     base = params.get("base_fdp_hours", 13.0)
     red = params.get("reduction_per_extra_sector_hours", 0.5)
     free = params.get("free_sectors", 2)
@@ -266,7 +275,7 @@ def rule_duty_02(snap: Snapshot, crew_id: str, cover_days: list[PairingDay],
             excess = total - cap
             led.add(f"duty_{window_days}d_excess[{d}]", round(excess, 2), "h")
             issues.append(
-                f"RULE-DUTY-02: would exceed {cap}h/{window_days}d by {fmt_hm(excess)} "
+                f"RULE-DUTY-02: would exceed {cap:g}h/{window_days}d by {fmt_hm(excess)} "
                 f"on {d} (total {total}h)"
             )
     return issues
@@ -299,7 +308,7 @@ def rule_flt_03(snap: Snapshot, crew_id: str, cover_days: list[PairingDay],
         led.add(f"flight_28d_headroom[{d}]", round(cap - base, 2), "h")
         if base > cap + EPS:
             binding = True
-            issues.append(f"RULE-FLT-03: would exceed {cap}h/{window_days}d on {d} (total {base}h)")
+            issues.append(f"RULE-FLT-03: would exceed {cap:g}h/{window_days}d on {d} (total {base}h)")
     led.add("flight_cap_hours", cap, "h", source="rules.json RULE-FLT-03")
     return issues, binding
 
