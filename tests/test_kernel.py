@@ -494,3 +494,77 @@ def test_s4_delay_unchanged_by_the_rest_check(snap):
     assert (d["fdp_after_delay"], d["fdp_limit"], d["breach"]) == (12.75, 12.0, True)
     assert d["legs_to_shed"] == ["DX404-2026-09-16"]
     assert d["rest_breach"] is False
+
+
+# ------------------------------------------------------------------ the desk
+# A JavaScript syntax error anywhere in ui.html disables EVERY button on the
+# page, silently -- the browser stops parsing and no handler is ever bound.
+# That shipped once: a patch turned an escaped newline inside a string literal
+# into a real one, and the whole desk went dead while looking perfectly normal.
+# Nothing in the Python test suite could see it, so nothing did.
+
+UI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                  "crewops", "ui.html")
+
+
+def _scripts():
+    import re
+    html = open(UI, encoding="utf-8").read()
+    return [m.group(1) for m in re.finditer(r"<script[^>]*>(.*?)</script>",
+                                            html, re.S) if m.group(1).strip()]
+
+
+def test_ui_javascript_parses():
+    """Every <script> block must parse. Skips cleanly where node is absent."""
+    import shutil, subprocess, tempfile
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available")
+    for i, js in enumerate(_scripts()):
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as fh:
+            fh.write(js)
+            path = fh.name
+        try:
+            r = subprocess.run([node, "--check", path],
+                               capture_output=True, text=True)
+            assert r.returncode == 0, f"script block {i} does not parse:\n{r.stderr}"
+        finally:
+            os.unlink(path)
+
+
+def test_ui_every_handler_is_defined():
+    """An onclick naming a function that does not exist is a dead button."""
+    import re
+    html = open(UI, encoding="utf-8").read()
+    called = set(re.findall(r'on\w+="(\w+)\(', html)) - {"if"}
+    defined = set(re.findall(r"function\s+(\w+)\s*\(", html)) | set(
+        re.findall(r"(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:function|\()", html))
+    assert not (called - defined), f"dead buttons: {sorted(called - defined)}"
+
+
+def test_ui_quotes_readable_facts_only():
+    """No invented crew, flights or figures in the markup.
+
+    These all shipped: flight AI-801 (this airline flies DX###), a
+    '14.5h pre-flight rest verified' nobody computed, and five pilots who do
+    not exist. A drafted callout is the last place to make up a number.
+    """
+    import re
+    html = open(UI, encoding="utf-8").read()
+    # Strip comments first: a note recording that we REMOVED an invented fact
+    # is not the invented fact coming back.
+    visible = re.sub(r"<!--.*?-->", " ", html, flags=re.S)
+    visible = re.sub(r"^\s*//.*$", " ", visible, flags=re.M)
+    visible = re.sub(r"/\*.*?\*/", " ", visible, flags=re.S)
+    for ghost in ("AI-801/802", "Sector AI-801", "AI-801..806",
+                  "Rajesh Verma", "Emily Rodriguez", "David Kim",
+                  "14.5h pre-flight rest", "margin: 35.5h"):
+        assert ghost not in visible, f"invented fact back in the UI: {ghost}"
+
+
+def test_ui_does_not_overclaim_regulatory_scope():
+    """Seven simplified rules is the declared scope; CAR Section 7 is not."""
+    html = open(UI, encoding="utf-8").read()
+    assert "Series J" not in html
+    assert "DGCA CAR SEC 7 VERIFIED" not in html

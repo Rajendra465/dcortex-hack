@@ -644,6 +644,9 @@ input, select { font: inherit; color: inherit; }
 
 .rule-badge-unit.ok { border-color: var(--brand-green); color: var(--brand-green-strong); }
 .rule-badge-unit.breached { border-color: var(--status-critical); color: var(--status-critical); background: rgba(224, 82, 82, 0.08); }
+/* Not breached and not checked are different claims. An untested rule is
+   shown as neither, so a green tick never stands in for a rule we skipped. */
+.rule-badge-unit.untested { border-color: var(--line, #cbd5cd); color: var(--ink-secondary); background: transparent; }
 
 /* Traced Number Chips */
 .num-chip {
@@ -1140,7 +1143,89 @@ input, select { font: inherit; color: inherit; }
 .resolve-loading {
     text-align: center; padding: 40px; color: var(--ink-muted);
 }
-.resolve-loading i { font-size: 2rem; color: var(--brand-green-strong); margin-bottom: 12px; display: block; }
+}
+
+/* ==========================================================================
+   MOTION
+   Framer Motion is React-only and this desk is one vanilla HTML file, so the
+   principles are applied with CSS and the Web Animations API instead: one
+   spring-like easing, entrances staggered by role rather than by index, and a
+   respected reduced-motion preference. No new dependency, which also means the
+   desk still animates with no network at the venue.
+   Budget: nothing exceeds 320ms. This is a tool, not a title sequence.
+   ========================================================================== */
+:root{
+  --ease-out: cubic-bezier(.22,1,.36,1);
+  --ease-spring: cubic-bezier(.34,1.4,.64,1);
+  --dur-1: 140ms;
+  --dur-2: 220ms;
+  --dur-3: 320ms;
+}
+@keyframes riseIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes popIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+@keyframes sweep{from{background-position:200% 0}to{background-position:-200% 0}}
+@keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+
+/* three-dot thinking indicator, replacing a spinner that implied work the
+   kernel was not doing */
+.thinking-dots{display:inline-flex;gap:4px;align-items:center}
+.thinking-dots i{width:5px;height:5px;border-radius:50%;background:var(--brand-green-strong);
+  display:block;animation:blink 1.25s infinite}
+.thinking-dots i:nth-child(2){animation-delay:.16s}
+.thinking-dots i:nth-child(3){animation-delay:.32s}
+
+/* entrance choreography: verdict first, supporting detail after, so the eye
+   lands on the answer before the reasoning arrives */
+.anim-in{animation:riseIn var(--dur-3) var(--ease-out) both}
+.advisor-card-rich .advisor-top-verdict{animation:riseIn var(--dur-2) var(--ease-out) both}
+.advisor-card-rich .rule-badges-deck{animation:riseIn var(--dur-2) var(--ease-out) both;animation-delay:60ms}
+.advisor-card-rich .candidates-deck-row{animation:riseIn var(--dur-3) var(--ease-out) both;animation-delay:110ms}
+.advisor-card-rich .dnet{animation:riseIn var(--dur-3) var(--ease-out) both;animation-delay:150ms}
+.rule-badge-unit{animation:popIn var(--dur-2) var(--ease-spring) both}
+.chat-bubble-user{animation:riseIn var(--dur-2) var(--ease-out) both}
+
+/* a badge reporting a breach earns one pulse; a green one does not */
+@keyframes breachPulse{0%{box-shadow:0 0 0 0 rgba(163,58,58,.45)}70%{box-shadow:0 0 0 7px rgba(163,58,58,0)}100%{box-shadow:0 0 0 0 rgba(163,58,58,0)}}
+.rule-badge-unit.breached{animation:popIn var(--dur-2) var(--ease-spring) both, breachPulse 1.1s var(--ease-out) .2s 2}
+.rule-badge-unit.untested{opacity:.55;font-style:italic}
+
+/* interactive things should look interactive */
+.cand-option-card,.rule-badge-unit,.dnet-head,.num-chip{transition:transform var(--dur-1) var(--ease-out),
+  box-shadow var(--dur-1) var(--ease-out), background-color var(--dur-1) linear}
+.cand-option-card:hover{transform:translateY(-2px)}
+.num-chip{cursor:pointer}
+.num-chip:hover{transform:translateY(-1px)}
+.dnet-body{animation:riseIn var(--dur-2) var(--ease-out) both}
+
+/* skeleton shimmer for tables that fetch */
+.is-loading{background:linear-gradient(90deg,transparent 25%,rgba(127,127,127,.14) 50%,transparent 75%);
+  background-size:200% 100%;animation:sweep 1.1s linear infinite}
+
+/* keyboard focus must be visible; it was not */
+:focus-visible{outline:2px solid var(--brand-green-strong);outline-offset:2px;border-radius:3px}
+
+/* Motion is a preference, not a decoration. Honour it. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important;scroll-behavior:auto!important}
+  .thinking-dots i{animation:none;opacity:.7}
+}
+
+/* ---- starter questions --------------------------------------------------
+   An empty input is the worst thing a tool under time pressure can show. These
+   are the real shipped questions, grouped by what they cost you: a lookup, a
+   consequence, or a recommendation. Clicking one runs it. */
+.starter-wrap{padding:10px 14px 0;display:flex;flex-direction:column;gap:7px}
+.starter-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.starter-tier{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--ink-muted);min-width:74px;flex:none}
+.starter-chip{font-size:.72rem;padding:4px 10px;border-radius:12px;cursor:pointer;
+  border:1px solid var(--hairline);background:var(--surface-2);color:var(--ink-secondary);
+  text-align:left;font-family:inherit;line-height:1.35}
+.starter-chip:hover{border-color:var(--brand-green);color:var(--ink-primary);transform:translateY(-1px)}
+.starter-chip.refuse{border-style:dashed}
+.starter-chip.refuse:hover{border-color:var(--brand-orange)}
+.starter-hint{font-size:.66rem;color:var(--ink-muted);padding:2px 0 0}
 </style>
 </head>
 <body>
@@ -1169,10 +1254,10 @@ input, select { font: inherit; color: inherit; }
                         <i class="fa-solid fa-users"></i> Crew Roster (150)
                     </div>
                     <div id="tabBtnReserves" class="nav-tab-item" onclick="switchOCCView('reserves')">
-                        <i class="fa-solid fa-business-time"></i> Reserve Matrix (16)
+                        <i class="fa-solid fa-business-time"></i> Standby crew (16)
                     </div>
                     <div id="tabBtnAudit" class="nav-tab-item" onclick="switchOCCView('audit')">
-                        <i class="fa-solid fa-shield-halved"></i> Audit Vault (42/42)
+                        <i class="fa-solid fa-shield-halved"></i> Answer keys
                     </div>
                 </nav>
             </div>
@@ -1240,15 +1325,15 @@ input, select { font: inherit; color: inherit; }
             <div class="kpi-unit">
                 <div class="kpi-icon-box orange"><i class="fa-solid fa-shield-check fa-shield-halved"></i></div>
                 <div class="kpi-texts">
-                    <span class="kpi-title">Harness Accuracy</span>
-                    <span class="kpi-val" style="color:var(--brand-green-strong)">42 / 42 (100%)</span>
+                    <span class="kpi-title">Answer-key score</span>
+                    <span class="kpi-val" style="color:var(--brand-green-strong)">42 right · 0 wrong</span>
                 </div>
             </div>
             <div class="kpi-unit">
                 <div class="kpi-icon-box green"><i class="fa-solid fa-bolt"></i></div>
                 <div class="kpi-texts">
-                    <span class="kpi-title">Solver Latency</span>
-                    <span class="kpi-val" style="color:var(--brand-green-strong)">&lt; 1.4 ms</span>
+                    <span class="kpi-title">Kernel time</span>
+                    <span class="kpi-val" style="color:var(--brand-green-strong)">~1.4 ms</span>
                 </div>
             </div>
         </div>
@@ -1297,7 +1382,7 @@ input, select { font: inherit; color: inherit; }
                 <!-- Threat Feed Box -->
                 <div class="cockpit-box" style="flex:1;">
                     <div class="box-header">
-                        <h4><i class="fa-solid fa-triangle-exclamation" style="color:var(--brand-orange)"></i> Threat Stream</h4>
+                        <h4><i class="fa-solid fa-triangle-exclamation" style="color:var(--brand-orange)"></i> What is breaking</h4>
                         <span style="font-size:0.68rem; color:var(--brand-green-strong); font-family:var(--font-mono);">Live Stream</span>
                     </div>
                     <div id="threatFeedBody" style="overflow-y:auto; flex:1;">
@@ -1307,7 +1392,7 @@ input, select { font: inherit; color: inherit; }
                                 <span style="font-size:0.65rem; color:var(--ink-muted);">15 Sep 05:00Z</span>
                             </div>
                             <strong style="color:var(--ink-primary); margin-top:2px;">Capt. C-1042 Sick Call</strong>
-                            <span style="color:var(--ink-secondary); font-size:0.7rem;">Uncrewed legs on P-2291 (AI-801/802/803). 486 pax at risk.</span>
+                            <span style="color:var(--ink-secondary); font-size:0.7rem;">Uncrewed legs on P-2291 (DX412/DX413/DX588). 486 seats at risk.</span>
                         </div>
                         <div class="threat-event-item">
                             <div class="threat-badge-row">
@@ -1338,7 +1423,7 @@ input, select { font: inherit; color: inherit; }
                     </h3>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="font-size:0.7rem; color:var(--brand-green-strong); font-family:var(--font-mono); background:var(--brand-green-soft); padding:2px 8px; border-radius:12px; border:1px solid var(--brand-green);">
-                            ● Symbolic Kernel (~1.4 ms)
+                            ● Kernel · ~1.4 ms
                         </span>
                         <button class="icon-btn" style="width:26px; height:26px;" onclick="clearChat()" title="Clear Console">
                             <i class="fa-solid fa-trash" style="font-size:0.7rem;"></i>
@@ -1352,22 +1437,25 @@ input, select { font: inherit; color: inherit; }
                     <div class="advisor-card-rich">
                         <div class="advisor-top-verdict">
                             <span class="verdict-tag pass">
-                                <i class="fa-solid fa-shield-check"></i> Solver Online · CAR Sec 7 Series J Active
+                                <i class="fa-solid fa-shield-check"></i> Kernel online · 7 rules loaded
                             </span>
-                            <span class="latency-metric">Deterministic Baseline (1.4 ms)</span>
+                            <span class="latency-metric">Kernel · 1.4 ms</span>
                         </div>
-                        <div class="card-heading-title">dCortex OCC Crew Ops Advisor Ready</div>
+                        <div class="card-heading-title">Crew Ops Advisor · ready</div>
                         <p style="font-size:0.82rem; color:var(--ink-secondary); line-height:1.5;">
-                            I am your operational copilot for DGCA CAR Section 7 Series J recovery. I translate colloquial disruption scenarios into formal mathematical queries, enforce hard duty ceilings, and return provably legal, cost-ranked candidate pairings without arithmetic hallucinations.
+                            Ask about crew, rosters, duty hours or a disruption. I turn the question into a typed plan, a deterministic kernel does every calculation against the seven rules in rules.json, and each number in the answer traces back to the roster. When the answer is not in this data, I say so rather than guess.
                         </p>
+                        <!-- At rest these are the rules we CAN check, not a verdict.
+                             They were seven green ticks before any question was
+                             asked, which reads as "all clear" on an empty desk. -->
                         <div class="rule-badges-deck">
-                            <span class="rule-badge-unit ok"><i class="fa-solid fa-check"></i> Aircraft Type</span>
-                            <span class="rule-badge-unit ok"><i class="fa-solid fa-check"></i> License &amp; Medical</span>
-                            <span class="rule-badge-unit ok"><i class="fa-solid fa-check"></i> Base Alignment</span>
-                            <span class="rule-badge-unit ok"><i class="fa-solid fa-check"></i> Daily FDP Cap</span>
-                            <span class="rule-badge-unit ok"><i class="fa-solid fa-check"></i> 12h Rest Buffer</span>
-                            <span class="rule-badge-unit ok"><i class="fa-solid fa-check"></i> 7D 60h Ceiling</span>
-                            <span class="rule-badge-unit ok"><i class="fa-solid fa-check"></i> 28D 100h Flight Cap</span>
+                            <span class="rule-badge-unit untested"><i class="fa-solid fa-minus"></i> Aircraft rating</span>
+                            <span class="rule-badge-unit untested"><i class="fa-solid fa-minus"></i> Licence &amp; medical</span>
+                            <span class="rule-badge-unit untested"><i class="fa-solid fa-minus"></i> Base / positioning</span>
+                            <span class="rule-badge-unit untested"><i class="fa-solid fa-minus"></i> Flight duty period</span>
+                            <span class="rule-badge-unit untested"><i class="fa-solid fa-minus"></i> 12h rest</span>
+                            <span class="rule-badge-unit untested"><i class="fa-solid fa-minus"></i> 60h / 7 days</span>
+                            <span class="rule-badge-unit untested"><i class="fa-solid fa-minus"></i> 100h / 28 days</span>
                         </div>
                     </div>
                 </div>
@@ -1386,8 +1474,11 @@ input, select { font: inherit; color: inherit; }
                             Can reserve C-3305 cover P-2291?
                         </button>
                     </div>
+                    <!-- Somewhere to start. Populated from /api/examples, which
+                         has been returning these all along with nothing calling it. -->
+                    <div class="starter-wrap" id="starterQuestions"></div>
                     <div class="chat-input-bar">
-                        <input type="text" id="chatQueryInput" class="chat-input-field" placeholder="Ask advisor: e.g. 'Can reserve C-3305 cover pairing P-2291?'" onkeydown="if(event.key==='Enter') sendChatQuery()">
+                        <input type="text" id="chatQueryInput" class="chat-input-field" placeholder="Ask about crew, rosters, duty hours, or a disruption" onkeydown="if(event.key==='Enter') sendChatQuery()">
                         <button class="btn-send-main" id="btnSendChat" onclick="sendChatQuery()">
                             <span>Ask Advisor</span>
                             <i class="fa-solid fa-paper-plane"></i>
@@ -1402,7 +1493,7 @@ input, select { font: inherit; color: inherit; }
                 <!-- 6-Axis Crew Recovery Legality Radar -->
                 <div class="cockpit-box">
                     <div class="box-header">
-                        <h4><i class="fa-solid fa-hexagon-nodes" style="color:var(--brand-green-strong)"></i> Legality Twin Radar</h4>
+                        <h4><i class="fa-solid fa-hexagon-nodes" style="color:var(--brand-green-strong)"></i> Crew headroom</h4>
                         <span id="activeRadarCrewTag" style="font-family:var(--font-mono); font-size:0.7rem; color:var(--brand-green-strong);">Capt. C-3310</span>
                     </div>
                     <div class="radar-stage-box">
@@ -1434,12 +1525,7 @@ input, select { font: inherit; color: inherit; }
                         </button>
                     </div>
                     <div class="outreach-draft-body" id="outreachDraftText">
-Hi Capt. Rajesh! This is dCortex OCC Dispatch. Due to crew sickness on Pairing P-2291 tomorrow (2026-09-15), you have been nominated for assignment on Sector AI-801 (DEL-BLR).
-
-DGCA CAR Section 7 Legality:
-• 14.5h pre-flight rest verified.
-• Rolling 7-day duty: 24.5h (margin: 35.5h).
-• Report Time: 06:00 UTC DEL Terminal 3.
+Pick a crew member to draft a callout. Every figure in the message is read from the roster — nothing here is written by hand.
                     </div>
                     <button class="btn-authorize-action" onclick="authorizeDispatch()">
                         <i class="fa-solid fa-circle-check"></i> Authorize &amp; Send Dispatch
@@ -1458,12 +1544,12 @@ DGCA CAR Section 7 Legality:
                             <span style="color:var(--status-critical)">Uncrewed</span>
                         </div>
                         <div class="ledger-fact-card">
-                            <span><b>P-2291:</b> 6 legs total</span>
-                            <span style="color:var(--ink-muted)">AI-801..806</span>
+                            <span><b>P-2291:</b> 6 legs over 2 days</span>
+                            <span style="color:var(--ink-muted)">DX412/413/588 · DX589/590/591</span>
                         </div>
                         <div class="ledger-fact-card">
-                            <span><b>C-3310:</b> 7D Duty 24.5h</span>
-                            <span style="color:var(--brand-green-strong)">Margin 35.5h</span>
+                            <span><b>C-3310:</b> 7-day duty</span>
+                            <span style="color:var(--ink-muted)">computed on demand</span>
                         </div>
                         <div class="ledger-fact-card">
                             <span><b>C-2087:</b> 7D Duty 51.5h</span>
@@ -1549,7 +1635,7 @@ DGCA CAR Section 7 Legality:
                     <div>
                         <h2 style="font-family:var(--font-header); font-size:1.25rem; color:var(--ink-primary);">
                             <i class="fa-solid fa-scale-balanced" style="color:var(--brand-green-strong)"></i>
-                            DGCA CAR Section 7 Series J Conformance Vault
+                            Rulebook conformance · where the prose and the data disagree
                         </h2>
                         <p style="font-size:0.8rem; color:var(--ink-secondary); margin-top:3px;">
                             Immutable mathematical proof ledger · 42/42 Correct Regression Score · Sub-2ms Latency
@@ -1567,13 +1653,13 @@ DGCA CAR Section 7 Legality:
                     </div>
                     <div style="background:var(--surface-2); border:1px solid var(--hairline); border-radius:8px; padding:1.25rem;">
                         <span style="font-size:0.72rem; color:var(--ink-muted); font-family:var(--font-mono);">COMPUTATIONAL BOUND</span>
-                        <h3 style="font-family:var(--font-header); font-size:1.8rem; color:var(--brand-orange); margin:4px 0;">&lt; 1.4 ms</h3>
+                        <h3 style="font-family:var(--font-header); font-size:1.8rem; color:var(--brand-orange); margin:4px 0;">~1.4 ms</h3>
                         <span style="font-size:0.72rem; color:var(--ink-secondary);">Worst case full-ranking search: 3.0 ms</span>
                     </div>
                     <div style="background:var(--surface-2); border:1px solid var(--hairline); border-radius:8px; padding:1.25rem;">
-                        <span style="font-size:0.72rem; color:var(--ink-muted); font-family:var(--font-mono);">LEGALITY GUARANTEE</span>
-                        <h3 style="font-family:var(--font-header); font-size:1.8rem; color:var(--ink-primary); margin:4px 0;">CAR SEC 7</h3>
-                        <span style="font-size:0.72rem; color:var(--ink-secondary);">Deterministic Python predicates</span>
+                        <span style="font-size:0.72rem; color:var(--ink-muted); font-family:var(--font-mono);">WHAT WE CHECK</span>
+                        <h3 style="font-family:var(--font-header); font-size:1.8rem; color:var(--ink-primary); margin:4px 0;">7 rules</h3>
+                        <span style="font-size:0.72rem; color:var(--ink-secondary);">Duty, rest, flight hours, ratings, certificates, base</span>
                     </div>
                 </div>
             </div>
@@ -1599,12 +1685,18 @@ DGCA CAR Section 7 Legality:
         flights: [],
         roster: [],
         reserves: [],
+        // Real values, computed from crew.json + duty_clocks.json at the
+        // snapshot. Previously five invented pilots -- 'Capt. Rajesh Verma',
+        // 'FO Emily Rodriguez' -- with invented percentages; two of them were
+        // also the wrong RANK (C-2087 and C-2210 are Captains, not FOs).
+        // cap7d is headroom against the 60h/7d ceiling, cap28d against
+        // 100h/28d, reach is inverted reachability_minutes over a 2h window.
         candidateRadarData: {
-            'C-3310': { name: 'Capt. Rajesh Verma', fdp: 95, rest: 92, cap7d: 82, cap28d: 76, reach: 98, fleet: 100 },
-            'C-3305': { name: 'Capt. Vikram Roy', fdp: 90, rest: 88, cap7d: 65, cap28d: 60, reach: 90, fleet: 100 },
-            'C-2087': { name: 'FO Emily Rodriguez', fdp: 30, rest: 25, cap7d: 20, cap28d: 45, reach: 85, fleet: 100 },
-            'C-1526': { name: 'Capt. David Kim', fdp: 88, rest: 85, cap7d: 75, cap28d: 70, reach: 80, fleet: 100 },
-            'C-2210': { name: 'FO Liam Patel', fdp: 92, rest: 90, cap7d: 85, cap28d: 80, reach: 75, fleet: 100 }
+            'C-3310': { name: 'Capt. D. Reddy', fdp: 100, rest: 91, cap7d: 100, cap28d: 91, reach: 62, fleet: 100 },
+            'C-3305': { name: 'Capt. V. Menon', fdp: 6, rest: 66, cap7d: 6, cap28d: 66, reach: 62, fleet: 100 },
+            'C-2087': { name: 'Capt. R. Iyer', fdp: 14, rest: 76, cap7d: 14, cap28d: 76, reach: 50, fleet: 100 },
+            'C-1526': { name: 'Capt. N. Sen', fdp: 50, rest: 31, cap7d: 50, cap28d: 31, reach: 25, fleet: 100 },
+            'C-2210': { name: 'Capt. S. Kapoor', fdp: 75, rest: 64, cap7d: 75, cap28d: 64, reach: 50, fleet: 100 },
         }
     };
 
@@ -1620,6 +1712,7 @@ DGCA CAR Section 7 Legality:
     document.addEventListener('DOMContentLoaded', async () => {
         initTheme();
         renderRadarSpider('C-3310');
+        loadStarterQuestions();      // never awaited: the desk must not wait on it
         await loadInitialData();
         initLiveStream();
     });
@@ -1775,8 +1868,8 @@ DGCA CAR Section 7 Legality:
         loadDiv.className = 'advisor-card-rich';
         loadDiv.innerHTML = `
             <div style="display:flex; align-items:center; gap:8px; color:var(--ink-secondary);">
-                <i class="fa-solid fa-circle-notch fa-spin" style="color:var(--brand-green-strong)"></i>
-                <span>Evaluating DGCA CAR Section 7 Series J constraints in deterministic kernel...</span>
+                <span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span id="loadPhase">Reading the question\u2026</span>
             </div>
         `;
         feed.appendChild(loadDiv);
@@ -1784,6 +1877,20 @@ DGCA CAR Section 7 Legality:
 
         const btn = document.getElementById('btnSendChat');
         btn.disabled = true;
+
+        // Name the stage actually running. The kernel is ~5 ms; anything longer
+        // is the model, and saying "deterministic kernel" through a twelve
+        // second wait trains a controller to distrust the label.
+        const phases = [
+            [0,    'Reading the question\u2026'],
+            [400,  'Routing to a capability\u2026'],
+            [1200, 'Planning \u2014 waiting on the model\u2026'],
+            [4000, 'Still waiting on the model. The kernel itself takes about 5 ms.']
+        ];
+        const timers = phases.map(([ms, txt]) => setTimeout(() => {
+            const el = document.getElementById('loadPhase');
+            if (el) el.textContent = txt;
+        }, ms));
 
         try {
             const res = await fetch('/api/ask', {
@@ -1796,11 +1903,86 @@ DGCA CAR Section 7 Legality:
         } catch (err) {
             loadDiv.innerHTML = `<span style="color:var(--status-critical);">Error evaluating request: ${err.message}</span>`;
         } finally {
+            timers.forEach(clearTimeout);
             btn.disabled = false;
             feed.scrollTop = feed.scrollHeight;
+            enter(loadDiv);
         }
     }
 
+
+
+
+    // ---- starter questions ------------------------------------------------
+    // Three tiers, because they are three different asks and a controller should
+    // see the difference: a lookup is nearly free, a consequence runs a
+    // simulation, a recommendation ranks legal options. The last row is
+    // deliberate -- one question the advisor REFUSES, so nobody discovers the
+    // limits by accident with an aircraft waiting.
+    const TIER_LABEL = {
+        T1: 'Look up',
+        T2: 'What breaks',
+        T3: 'What to do',
+        REFUSE: 'Will refuse'
+    };
+
+    async function loadStarterQuestions() {
+        const host = document.getElementById('starterQuestions');
+        if (!host) return;
+        try {
+            const res = await fetch('/api/examples');
+            const list = await res.json();
+            const byTier = {};
+            list.forEach(function (e) {
+                (byTier[e.tier] = byTier[e.tier] || []).push(e.q);
+            });
+            host.innerHTML = ['T1', 'T2', 'T3', 'REFUSE'].filter(function (t) {
+                return byTier[t] && byTier[t].length;
+            }).map(function (t) {
+                const chips = byTier[t].slice(0, t === 'T1' ? 3 : 2).map(function (q) {
+                    const cls = 'starter-chip' + (t === 'REFUSE' ? ' refuse' : '');
+                    return '<button class="' + cls + '" type="button" ' +
+                           'onclick="runStarter(this)">' + escapeHtml(q) + '</button>';
+                }).join('');
+                return '<div class="starter-row"><span class="starter-tier">' +
+                       (TIER_LABEL[t] || t) + '</span>' + chips + '</div>';
+            }).join('') +
+            '<div class="starter-hint">Click one, or type your own. ' +
+            'Every answer shows the rules it checked and who it ruled out.</div>';
+            stagger(host.querySelectorAll('.starter-row'), 40);
+        } catch (err) {
+            host.innerHTML = '';   // never block the desk on decoration
+        }
+    }
+
+    function runStarter(btn) {
+        submitCustomPrompt(btn.textContent);
+    }
+
+    // ---- motion helpers ---------------------------------------------------
+    // Framer Motion needs React; this desk is one vanilla file. These give the
+    // three things that actually matter -- an entrance, a stagger, and a
+    // respected reduced-motion preference -- with no dependency to fail at the
+    // venue.
+    const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function enter(el, delay) {
+      if (!el || REDUCED) return;
+      el.classList.remove('anim-in');
+      void el.offsetWidth;                 // restart the animation
+      el.style.animationDelay = (delay || 0) + 'ms';
+      el.classList.add('anim-in');
+    }
+
+    // Stagger by row so a table reads as arriving rather than blinking into
+    // place. Capped: past ~12 rows the delay stops growing, because a
+    // controller should never wait on choreography.
+    function stagger(nodes, step) {
+      if (REDUCED) return;
+      Array.prototype.slice.call(nodes).forEach(function (n, i) {
+        enter(n, Math.min(i, 12) * (step || 22));
+      });
+    }
 
     // ---- decision network -------------------------------------------------
     // Every point where the advisor could have gone another way, in order.
@@ -1870,12 +2052,12 @@ DGCA CAR Section 7 Legality:
         const isRefuse = ans.tier === 'REFUSE' || ans.answer_type === 'refusal';
 
         let tagClass = 'pass';
-        let verdictTxt = 'VERIFIED PASS';
+        let verdictTxt = 'LEGAL \u00b7 7 RULES CHECKED';
         let cardClass = '';
 
         if (isRefuse) {
             tagClass = 'refuse';
-            verdictTxt = 'REFUSED (CONFIDENTIALITY)';
+            verdictTxt = 'DECLINED \u00b7 OUTSIDE WHAT WE HOLD';
             cardClass = 'refusal';
         } else if (isBreach) {
             tagClass = 'fail';
@@ -1883,26 +2065,48 @@ DGCA CAR Section 7 Legality:
             cardClass = 'breach';
         } else {
             tagClass = 'pass';
-            verdictTxt = 'DGCA CAR SEC 7 VERIFIED';
+            verdictTxt = 'LEGAL \u00b7 7 RULES CHECKED';
         }
 
         cardElem.className = `advisor-card-rich ${cardClass}`;
 
-        // 7 Rule Badges
-        const issues = new Set(ans.issues || []);
+        // 7 rule badges, keyed off the real rule ids.
+        //
+        // This read `ans.issues`, which does not exist -- the kernel puts them
+        // on `ans.result.issues`. The set was therefore always empty and all
+        // seven badges always rendered green, including on a genuine breach:
+        // ask "can C-2087 cover P-2291" and the kernel returns two
+        // RULE-DUTY-02 violations (61.33h against a 60h limit) while the
+        // badges reported every rule passed. Four of the old match keys
+        // ('aircraft', 'license', '60h', '100h') could not have matched a rule
+        // id even with the right data behind them.
+        //
+        // A badge now has three states, because "not breached" and "not
+        // checked" are different claims, and a green tick on an unevaluated
+        // rule is the same lie in a quieter voice.
+        const issues = (resObj.issues || []);
+        const evaluated = new Set(resObj.rules_evaluated || []);
+        const breached = new Set(issues.map(i => String(i).split(':')[0].trim()));
         const rules = [
-            { name: 'Aircraft Type', k: 'aircraft' },
-            { name: 'License/Medical', k: 'license' },
-            { name: 'Base Alignment', k: 'base' },
-            { name: 'Daily FDP Cap', k: 'fdp' },
-            { name: '12h Rest Buffer', k: 'rest' },
-            { name: '7D 60h Cap', k: '60h' },
-            { name: '28D 100h Cap', k: '100h' }
+            { id: 'RULE-QUAL-05', name: 'Aircraft rating' },
+            { id: 'RULE-CERT-06', name: 'Licence & medical' },
+            { id: 'RULE-BASE-07', name: 'Base / positioning' },
+            { id: 'RULE-FDP-01',  name: 'Flight duty period' },
+            { id: 'RULE-REST-04', name: '12h rest' },
+            { id: 'RULE-DUTY-02', name: '60h / 7 days' },
+            { id: 'RULE-FLT-03',  name: '100h / 28 days' }
         ];
 
         const badgesHtml = rules.map(r => {
-            const fail = Array.from(issues).some(i => i.toLowerCase().includes(r.k));
-            return `<span class="rule-badge-unit ${fail ? 'breached' : 'ok'}"><i class="fa-solid ${fail ? 'fa-xmark' : 'fa-check'}"></i> ${r.name}</span>`;
+            const fail = breached.has(r.id);
+            const checked = evaluated.size === 0 || evaluated.has(r.id);
+            const state = fail ? 'breached' : (checked ? 'ok' : 'untested');
+            const icon = fail ? 'fa-xmark' : (checked ? 'fa-check' : 'fa-minus');
+            const detail = fail
+                ? issues.filter(i => String(i).startsWith(r.id)).join(' / ')
+                : (checked ? r.id + ' satisfied'
+                           : r.id + ' not evaluated for this question');
+            return `<span class="rule-badge-unit ${state}" title="${escapeHtml(detail)}"><i class="fa-solid ${icon}"></i> ${r.name}</span>`;
         }).join('');
 
         // Traced Number Chips
@@ -2081,25 +2285,43 @@ DGCA CAR Section 7 Legality:
         }
     }
 
-    // 6. Update Outreach Dispatch Box
-    function updateDispatchBox(crewId) {
+    // 6. Outreach dispatch box
+    //
+    // These three drafts were hardcoded, and every fact in them was invented:
+    // flight "AI-801" (an Air India number -- this airline flies DX###),
+    // "Rest buffer: 14.5h verified" and "7D duty margin: 35.5h" (numbers no
+    // kernel ever computed), and a blanket "DGCA CAR Sec 7 Status: Fully
+    // Legal". A drafted message a controller might actually send is the last
+    // place to invent a number.
+    //
+    // /api/outreach already returns the real thing -- the crew member's name,
+    // their real pairing, the real legs and the real report time -- straight
+    // out of the kernel. Use it.
+    async function updateDispatchBox(crewId) {
         const box = document.getElementById('outreachDraftText');
         if (!box) return;
-        const ch = STATE.activeChannel;
-
-        if (ch === 'whatsapp') {
-            box.textContent = `Hi ${crewId}! This is dCortex OCC Dispatch. Due to an operational sickness on Pairing P-2291 tomorrow (2026-09-15), you are assigned to Sector AI-801 (DEL-BLR).
-
-DGCA CAR Sec 7 Status: Fully Legal.
-• Rest buffer: 14.5h verified.
-• 7D duty margin: 35.5h before 60h ceiling.
-• Report: 06:00 UTC at DEL Base. Please confirm.`;
-        } else if (ch === 'acars') {
-            box.textContent = `/ARINC 620/ OCC CALLOUT / ${crewId}
-FLIGHT: AI-801 DEL-BLR / 15 SEP 07:00Z
-CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
-        } else {
-            box.textContent = `dCortex OCC: ${crewId} assigned to AI-801 on 15 Sep. Report 06:00Z DEL. CAR Sec 7 legal. Reply Y.`;
+        box.classList.add('is-loading');
+        box.textContent = 'Drafting from the roster…';
+        try {
+            const res = await fetch('/api/outreach', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({crew_id: crewId, pairing_id: STATE.activePairing || 'P-2291',
+                                      channel: STATE.activeChannel})
+            });
+            const d = await res.json();
+            const text = (d.channels || {})[STATE.activeChannel];
+            if (!text) throw new Error(d.error || 'no draft for this channel');
+            box.textContent = text;
+            enter(box);
+        } catch (err) {
+            // Say what failed. A stale draft on screen is worse than no draft.
+            box.textContent = 'Could not draft this notification: ' + err.message +
+                '\n\nNothing has been sent. The roster is the source for every ' +
+                'figure in a callout, so we would rather show you nothing than ' +
+                'a number we made up.';
+        } finally {
+            box.classList.remove('is-loading');
         }
     }
 
@@ -2161,10 +2383,10 @@ CAR SEC 7 COMPLIANT. ACK VIA CPDLC.`;
         feed.innerHTML = `
             <div class="advisor-card-rich">
                 <div class="advisor-top-verdict">
-                    <span class="verdict-tag pass"><i class="fa-solid fa-shield-check"></i> Solver Online · CAR Sec 7 Active</span>
-                    <span class="latency-metric">Baseline (1.4 ms)</span>
+                    <span class="verdict-tag pass"><i class="fa-solid fa-shield-check"></i> Kernel online · 7 rules loaded</span>
+                    <span class="latency-metric">Kernel · 1.4 ms</span>
                 </div>
-                <div class="card-heading-title">dCortex OCC Crew Ops Advisor Ready</div>
+                <div class="card-heading-title">Crew Ops Advisor · ready</div>
                 <p style="font-size:0.82rem; color:var(--ink-secondary); line-height:1.5;">
                     Console cleared. Ready for your next operational query or disruption scenario.
                 </p>
