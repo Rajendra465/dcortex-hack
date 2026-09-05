@@ -220,6 +220,16 @@ button{font-family:inherit}
 .scn:hover .x{display:block}
 .scn .x:hover{background:var(--bad-bg);color:var(--bad)}
 .filters{display:flex;gap:5px;margin-left:auto;text-transform:none;letter-spacing:0;flex-wrap:wrap}
+/* Collapse the whole panel. A controller who has dealt with the morning does
+   not want six disruption buttons between them and the question they are
+   typing -- and the choice survives a reload, because re-opening it on every
+   visit is the same annoyance with extra steps. */
+.launch-x{background:none;border:1px solid var(--line);color:var(--dim);border-radius:5px;
+  cursor:pointer;font-size:11px;padding:2px 9px;line-height:1.5;font-family:inherit}
+.launch-x:hover{border-color:var(--accent);color:var(--ink)}
+.launch.shut .launch-b,.launch.shut .filters{display:none}
+.launch.shut .launch-h{border-bottom:none}
+.launch.shut .launch-x{color:var(--accent);border-color:var(--accent)}
 .filt{font-size:11px;padding:3px 9px;border-radius:11px;cursor:pointer;
   border:1px solid var(--line);background:transparent;color:var(--dim)}
 .filt.on{border-color:var(--accent);color:var(--ink);background:var(--accent-bg)}
@@ -250,8 +260,9 @@ button{font-family:inherit}
 
 <div class="wrap">
 
-  <div class="launch">
+  <div class="launch" id="launch">
     <div class="launch-h"><span class="live-dot" id="liveDot"></span>Disruptions
+      <button class="launch-x" id="launchX" onclick="toggleLaunch()">Hide</button>
       <span class="filters">
         <button class="filt on" onclick="filterScn(this,'all')">All</button>
         <button class="filt" onclick="filterScn(this,'SICK_CREW')">Sick</button>
@@ -327,6 +338,7 @@ async function boot(){
         onclick="ask(this.textContent)">${esc(e.q)}</button>`).join('');
   }catch(e){}
 
+  restoreLaunch();
   live();
 }
 
@@ -644,6 +656,22 @@ function playCallout(btn, crew, pairing){
 }
 
 /* ---------------------------------------------------------------- filters */
+/* Shut or open the disruption panel, and remember which. */
+function toggleLaunch(){
+  const el = document.getElementById('launch');
+  const shut = el.classList.toggle('shut');
+  document.getElementById('launchX').textContent = shut ? 'Show' : 'Hide';
+  try{ localStorage.setItem('desk.launch', shut ? 'shut' : 'open'); }catch(e){}
+}
+function restoreLaunch(){
+  let shut = false;
+  try{ shut = localStorage.getItem('desk.launch') === 'shut'; }catch(e){}
+  if(shut){
+    document.getElementById('launch').classList.add('shut');
+    document.getElementById('launchX').textContent = 'Show';
+  }
+}
+
 function filterScn(btn, kind){
   document.querySelectorAll('.filt').forEach(b=>b.classList.toggle('on', b===btn));
   document.querySelectorAll('#scnBar .scn').forEach(el=>{
