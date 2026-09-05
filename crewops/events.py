@@ -17,7 +17,7 @@ from dataclasses import dataclass, field, replace
 from datetime import timedelta
 from typing import Any
 
-from .data import Pairing, Snapshot, hours, parse_utc
+from .data import DutyDay, Pairing, Snapshot, hours, parse_utc
 from .kernel import check_cover, cover_options, solve_joint
 from .rules import Ledger, duty_period, fdp_limit
 
@@ -67,6 +67,29 @@ class CertExpiry(Event):
 
 
 @dataclass(frozen=True, kw_only=True)
+class Assign(Event):
+    """A decision the controller actually took: this person now flies that trip.
+
+    Every other event here is something that HAPPENS TO the airline. This is
+    the only one the controller causes, and until now the desk could not
+    express it -- you could ask who should cover P-2291, authorise C-3310, and
+    the roster still said the trip was uncrewed. The next question was then
+    answered against a world where the decision had never been made, which is
+    exactly how an advisor ends up offering the same reserve twice.
+
+    Assigning is not free, and the cost is the point: the person stops being
+    cover for everyone else, and their own duty clock starts filling.
+    """
+    crew_id: str = ""
+    pairing_id: str = ""
+    role: str = "Captain"
+    type: str = "ASSIGN"
+
+    def describe(self) -> str:
+        return f"{self.crew_id} assigned to {self.pairing_id} as {self.role}"
+
+
+@dataclass(frozen=True, kw_only=True)
 class StationClosure(Event):
     station: str = ""
     start_utc: str = ""
@@ -109,9 +132,40 @@ def apply(snap: Snapshot, events: list[Event]) -> Snapshot:
     out.pairings = dict(snap.pairings)
     out.roster = {k: list(v) for k, v in snap.roster.items()}
     out.crew = dict(snap.crew)
+    out.reserves = dict(snap.reserves)
     changed = False
 
     for ev in events:
+        if isinstance(ev, Assign):
+            p = out.pairings.get(ev.pairing_id)
+            if not p or ev.crew_id not in out.crew:
+                continue
+            # Replace whoever held the role; a trip has one captain.
+            kept = tuple((c, r) for c, r in p.crew if r != ev.role)
+            out.pairings[ev.pairing_id] = Pairing(
+                pairing_id=p.pairing_id, aircraft=p.aircraft, days=p.days,
+                crew=kept + ((ev.crew_id, ev.role),),
+            )
+            # The roster holds DutyDay, not PairingDay -- appending the raw
+            # pairing days left entries with no pairing_id and blew up every
+            # consumer that filters on it.
+            out.roster[ev.crew_id] = list(out.roster.get(ev.crew_id, [])) + [
+                DutyDay(day=d.day, report=d.report, release=d.release,
+                        duty_hours=hours(d.release - d.report),
+                        flight_hours=sum(snap.flights[f].block_hours
+                                         for f in d.flights
+                                         if f in snap.flights),
+                        pairing_id=p.pairing_id)
+                for d in p.days]
+            # A standby captain who is now flying is not standby cover any
+            # more. Leaving them in the reserve pool is how the same person
+            # gets offered twice for two different sick calls -- which is
+            # precisely what scenario S6 is built to catch.
+            if ev.crew_id in out.reserves:
+                out.reserves = {k: v for k, v in out.reserves.items()
+                                if k != ev.crew_id}
+            changed = True
+            continue
         if isinstance(ev, (SickCrew, CertExpiry)):
             cid = ev.crew_id
             if cid not in out.crew:

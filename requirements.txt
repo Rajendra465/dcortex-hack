@@ -1,0 +1,24 @@
+# Crew Ops Advisor -- dependencies
+#
+# The deterministic core needs nothing but the standard library. Every line
+# below is optional, and the system degrades cleanly without it: no key, no
+# network, no packages, and it still answers 42 of 42 with zero wrong.
+#
+#     pip install -r requirements.txt
+#
+# Nothing here is needed for the seven legality rules, the kernel, the desk,
+# the HTTP server, or the Sarvam integration. Sarvam talks over urllib, so
+# translation and speech add no dependency at all.
+
+pytest>=8.0        # the test suite: 204 tests, including the brief's own questions
+
+rich>=13.0         # nicer CLI tables; falls back to plain text when absent
+openai>=1.40       # NVIDIA NIM planner, over the OpenAI-compatible endpoint
+anthropic>=0.40    # the same planner role, as an alternative provider
+
+# Keys, if you want the optional lanes, go in .env (never committed):
+#   NVIDIA_API_KEY   or  ANTHROPIC_API_KEY   -- model-assisted planning
+#   SARVAM_API_KEY                           -- callouts in 10 Indian languages
+#
+# With none of them set the deterministic index plans, templates narrate, and
+# callouts draft in English. That is the point: the model is removable.

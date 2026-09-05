@@ -216,10 +216,10 @@ def check_cover(
     issues: list[str] = []
     for day in shifted:
         issues += rule_cert_06(snap, crew_id, day.day, led, strict=strict_certs)
-        issues += rule_fdp_01(day, led)
+        issues += rule_fdp_01(snap, day, led)
 
     sim = build_timeline(snap, crew_id, shifted, exclude_pairing)
-    issues += rule_rest_04(sim, led)
+    issues += rule_rest_04(snap, sim, led)
 
     # DUTY-02 uses the UNDELAYED durations, matching the reference
     issues += rule_duty_02(snap, crew_id, cover_days, exclude_pairing, led)

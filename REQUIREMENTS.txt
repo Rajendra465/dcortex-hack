@@ -1,7 +1,0 @@
-# The deterministic core needs nothing but the standard library.
-# Everything here is optional and the system degrades cleanly without it.
-
-rich>=13.0        # nicer CLI tables; falls back to plain text
-openai>=1.40      # NVIDIA NIM planner (OpenAI-compatible endpoint)
-anthropic>=0.40   # Anthropic planner, as an alternative
-pytest>=8.0       # test suite
